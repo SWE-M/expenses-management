@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مدير المصاريف (الإصدار الذهبي)</title>
+    <title>مدير المصاريف (الإصدار الذهبي + المعاينة)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <!-- مكتبات فايربيس (Firestore فقط - لا مشاكل تخزين) -->
+    <!-- مكتبات فايربيس (Firestore فقط) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
@@ -19,6 +19,11 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .cat-btn.selected { border-color: #f59e0b; background-color: #fef3c7; transform: scale(0.98); }
         .progress-bar { transition: width 0.1s linear; }
+        
+        /* تنسيق نافذة المعاينة */
+        .viewer-container { width: 100%; height: 60vh; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: #f9fafb; display: flex; align-items: center; justify-content: center; }
+        .viewer-iframe { width: 100%; height: 100%; border: none; }
+        .viewer-img { max-width: 100%; max-height: 100%; object-fit: contain; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 pb-24 select-none">
@@ -28,7 +33,7 @@
         <div class="flex justify-between items-center mb-8 mt-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-gray-900">مشاريعي</h1>
-                <p class="text-gray-500 text-sm">النسخة الشاملة (V10)</p>
+                <p class="text-gray-500 text-sm">النسخة الشاملة (V11)</p>
             </div>
             <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-yellow-500 font-bold text-xl shadow-sm border border-gray-200">🏢</div>
         </div>
@@ -72,6 +77,44 @@
     </div>
 
     <!-- 3. النوافذ المنبثقة -->
+    
+    <!-- نافذة عرض وتفاصيل المصروف (المعاينة) -->
+    <div id="viewExpenseModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-800" id="view-title">تفاصيل الفاتورة</h3>
+                <button onclick="closeModal('viewExpenseModal')" class="bg-white p-2 rounded-full text-gray-600 hover:bg-gray-200 border">✕</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <p class="text-sm text-gray-500">المبلغ المدفوع</p>
+                        <h2 class="text-4xl font-extrabold text-gray-900" id="view-amount">0</h2>
+                    </div>
+                    <div class="text-left">
+                        <span class="px-3 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-600" id="view-category">تصنيف</span>
+                        <p class="text-xs text-gray-400 mt-1" id="view-date">--/--/----</p>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-4">
+                    <h4 class="font-bold text-gray-700 mb-3">المرفقات</h4>
+                    <div id="view-attachments-container" class="space-y-4">
+                        <!-- هنا سيتم عرض الملفات -->
+                        <div class="text-center text-gray-400 py-4">جاري تحميل المرفقات...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex gap-3">
+                <button id="view-edit-btn" class="flex-1 py-3 bg-white border border-gray-300 text-gray-700 rounded-xl font-bold hover:bg-gray-50">تعديل</button>
+                <button id="view-delete-btn" class="flex-1 py-3 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold hover:bg-red-100">حذف</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- مودال مشروع جديد -->
     <div id="newProjectModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity">
         <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-100 transition-transform">
             <h3 class="text-xl font-bold text-gray-800 mb-4">اسم المشروع الجديد</h3>
@@ -81,6 +124,7 @@
         </div>
     </div>
 
+    <!-- مودال إضافة/تعديل مصروف -->
     <div id="addExpenseModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 backdrop-blur-sm">
         <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[90vh] sm:h-auto overflow-y-auto relative transition-transform transform translate-y-0">
             <div class="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-2 border-b border-gray-100">
@@ -119,13 +163,12 @@
 
                 <div class="mt-2">
                     <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition relative group bg-white">
-                        <!-- يقبل جميع أنواع الملفات -->
                         <input type="file" id="exp-files" class="hidden" multiple accept="*/*" onchange="handleFileSelect(this)">
                         <div id="upload-placeholder">
                             <div class="mx-auto w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </div>
-                            <span class="text-sm font-bold text-gray-700">إضافة ملفات (صور، PDF، Word)</span>
+                            <span class="text-sm font-bold text-gray-700">إضافة ملفات (PDF, صور, Excel)</span>
                             <p class="text-xs text-gray-400 mt-1">اضغط هنا للاختيار</p>
                         </div>
                     </label>
@@ -147,9 +190,6 @@
     </div>
 
     <script>
-        // ============================================================
-        // إعدادات فايربيس (Firestore فقط - لا مشاكل تخزين، لا دفع)
-        // ============================================================
         const firebaseConfig = {
           apiKey: "AIzaSyCRbN9PDuoqZ60BAU79S-cY_ka9dtLerL4",
           authDomain: "baba-app-final.firebaseapp.com",
@@ -167,7 +207,6 @@
         let unsubscribe = null;
         let selectedFilesRaw = [];
         let currentAttachments = [];
-        // حجم القطعة للتقطيع (800 كيلو بايت لتفادي حد 1 ميجا)
         const CHUNK_SIZE = 800 * 1024; 
 
         // 1. إدارة المشاريع
@@ -246,34 +285,13 @@
                     if(data.category === 'decor') { icon = '🎨'; color = 'bg-purple-50 text-purple-600'; }
                     if(data.category === 'goods') { icon = '📦'; color = 'bg-blue-50 text-blue-600'; }
 
-                    // عرض المرفقات (بأيقونات ذكية)
-                    let attachmentsHTML = '';
-                    const files = data.filesSummary || [];
-                    
-                    if(files.length > 0) {
-                        attachmentsHTML = `<div class="flex flex-wrap gap-2 mt-3">`;
-                        files.forEach((file) => {
-                            let typeIcon = '📄';
-                            if(file.type.includes('image')) typeIcon = '🖼️';
-                            if(file.type.includes('pdf')) typeIcon = '📕';
-                            if(file.type.includes('word') || file.type.includes('doc')) typeIcon = '📝';
-                            if(file.type.includes('sheet') || file.type.includes('excel')) typeIcon = '📊';
-
-                            attachmentsHTML += `
-                            <button onclick="downloadFile('${expenseId}', '${file.id}', '${file.name}', ${file.isChunked})" class="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">
-                                <span>${typeIcon}</span>
-                                <span class="truncate max-w-[100px]">${file.name}</span>
-                            </button>`;
-                        });
-                        attachmentsHTML += `</div>`;
-                    }
-
                     const safeName = data.name ? data.name.replace(/'/g, "\\'") : "بدون اسم";
                     const dateStr = data.date ? new Date(data.date.toDate()).toLocaleDateString('en-GB') : '';
                     
+                    // جعل البطاقة قابلة للضغط لفتح التفاصيل
                     list.innerHTML += `
-                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col mb-3 animate-fade-in">
-                        <div class="flex justify-between items-start w-full mb-2">
+                    <div onclick="openExpenseDetails('${expenseId}', '${safeName}', '${amt}', '${data.category}', '${dateStr}')" class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col mb-3 animate-fade-in cursor-pointer hover:shadow-md transition">
+                        <div class="flex justify-between items-start w-full">
                             <div class="flex items-center gap-3 overflow-hidden">
                                 <div class="${color} w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-sm">${icon}</div>
                                 <div class="overflow-hidden">
@@ -282,17 +300,6 @@
                                 </div>
                             </div>
                             <span class="font-extrabold text-red-500 text-xl flex-shrink-0">-${amt.toLocaleString()}</span>
-                        </div>
-                        
-                        ${attachmentsHTML}
-
-                        <div class="flex justify-end gap-2 mt-3 border-t border-gray-50 pt-3">
-                            <button onclick="prepareEditExpense('${expenseId}', '${safeName}', '${amt}', '${data.category}')" class="text-blue-600 bg-blue-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-blue-100 transition">
-                                ✏️ تعديل
-                            </button>
-                            <button onclick="deleteExpense('${expenseId}')" class="text-red-600 bg-red-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-red-100 transition">
-                                🗑️ حذف
-                            </button>
                         </div>
                     </div>`;
                 });
@@ -304,7 +311,104 @@
         }
 
         // ============================================
-        // 3. نظام التقطيع الذكي (للملفات الكبيرة)
+        // 3. تفاصيل ومعاينة المصروف (الجديد)
+        // ============================================
+        async function openExpenseDetails(expenseId, name, amount, category, date) {
+            // تعبئة البيانات الأساسية
+            document.getElementById('view-title').innerText = name;
+            document.getElementById('view-amount').innerText = Number(amount).toLocaleString() + " ريال";
+            document.getElementById('view-date').innerText = date;
+            
+            const catMap = {'equipment':'معدات', 'goods':'بضاعة', 'decor':'ديكور', 'gov':'حكومي', 'other':'أخرى'};
+            document.getElementById('view-category').innerText = catMap[category] || 'أخرى';
+
+            // إعداد أزرار التعديل والحذف
+            document.getElementById('view-edit-btn').onclick = () => { closeModal('viewExpenseModal'); prepareEditExpense(expenseId, name, amount, category); };
+            document.getElementById('view-delete-btn').onclick = () => { closeModal('viewExpenseModal'); deleteExpense(expenseId); };
+
+            // تحميل وعرض المرفقات
+            const container = document.getElementById('view-attachments-container');
+            container.innerHTML = `<div class="text-center text-gray-400 py-4"><div class="loader mx-auto mb-2"></div>جاري جلب الملفات...</div>`;
+            openModal('viewExpenseModal');
+
+            try {
+                const doc = await db.collection("projects").doc(currentProjectId).collection("expenses").doc(expenseId).get();
+                const data = doc.data();
+                const filesSummary = data.filesSummary || [];
+
+                if (filesSummary.length === 0) {
+                    container.innerHTML = `<div class="text-center text-gray-400 py-4 bg-gray-50 rounded-xl border border-dashed">لا توجد مرفقات</div>`;
+                } else {
+                    container.innerHTML = ""; // مسح اللودر
+                    
+                    // معالجة كل ملف
+                    for (const file of filesSummary) {
+                        // جلب بيانات الملف (تجميع القطع)
+                        const base64Data = await getFileData(expenseId, file.id, file.isChunked);
+                        
+                        // تحديد نوع العرض
+                        let contentHTML = '';
+                        if (file.type.startsWith('image/')) {
+                            contentHTML = `<div class="viewer-container"><img src="${base64Data}" class="viewer-img"></div>`;
+                        } else if (file.type ===('application/pdf')) {
+                            contentHTML = `<div class="viewer-container"><iframe src="${base64Data}" class="viewer-iframe"></iframe></div>`;
+                        } else {
+                            // ملفات أخرى (Word, Excel) - لا يمكن عرضها في iframe محلياً بدون سيرفر
+                            // نعرض زر فتح صريح
+                            contentHTML = `
+                            <div class="p-4 bg-blue-50 rounded-xl flex items-center justify-between border border-blue-100">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-2xl">📄</span>
+                                    <div>
+                                        <p class="font-bold text-sm text-gray-800">${file.name}</p>
+                                        <p class="text-xs text-gray-500">مستند نصي/جدول</p>
+                                    </div>
+                                </div>
+                                <a href="${base64Data}" download="${file.name}" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-blue-700">فتح / تحميل</a>
+                            </div>`;
+                        }
+
+                        // إضافة العنصر للقائمة
+                        const itemDiv = document.createElement('div');
+                        itemDiv.innerHTML = `
+                            <div class="mb-4">
+                                <p class="text-xs font-bold text-gray-500 mb-1 flex justify-between">
+                                    <span>📎 ${file.name}</span>
+                                    ${file.type.startsWith('image/') || file.type === 'application/pdf' ? `<a href="${base64Data}" download="${file.name}" class="text-blue-500 hover:underline">تحميل</a>` : ''}
+                                </p>
+                                ${contentHTML}
+                            </div>
+                        `;
+                        container.appendChild(itemDiv);
+                    }
+                }
+            } catch (e) {
+                container.innerHTML = `<div class="text-red-500 text-center">فشل تحميل المرفقات</div>`;
+                console.error(e);
+            }
+        }
+
+        // دالة مساعدة لجلب وتجميع بيانات الملف
+        async function getFileData(expenseId, fileId, isChunked) {
+            const fileDocRef = db.collection("projects").doc(currentProjectId)
+                                .collection("expenses").doc(expenseId)
+                                .collection("files").doc(fileId);
+
+            if (!isChunked) {
+                const doc = await fileDocRef.get();
+                return doc.data().data;
+            } else {
+                const chunksSnap = await fileDocRef.collection('chunks').orderBy('index').get();
+                let finalBase64 = "";
+                chunksSnap.forEach(chunkDoc => {
+                    finalBase64 += chunkDoc.data().data;
+                });
+                return finalBase64;
+            }
+        }
+
+        // ============================================
+        // 4. نظام التقطيع والحفظ
         // ============================================
         function readFileAsBase64(file) {
             return new Promise((resolve, reject) => {
@@ -332,66 +436,45 @@
                 let expenseRef;
                 let filesSummary = [];
 
-                // إذا كان تعديل، نجلب المرفقات القديمة أولاً
                 if (editId) {
                     expenseRef = db.collection("projects").doc(currentProjectId).collection("expenses").doc(editId);
                     filesSummary = currentAttachments.filter(f => !f.deleted);
                 } else {
-                    // إنشاء مستند جديد للمصروف
                     expenseRef = await db.collection("projects").doc(currentProjectId).collection("expenses").add({
                         amount: Number(amt),
                         name: name,
                         category: cat,
                         date: new Date(),
-                        filesSummary: [] // مؤقتاً
+                        filesSummary: []
                     });
                 }
 
-                // معالجة الملفات الجديدة
                 for(let i=0; i < selectedFilesRaw.length; i++) {
                     const file = selectedFilesRaw[i];
                     const progress = ((i / selectedFilesRaw.length) * 100);
                     updateProgress(progress, `جاري رفع: ${file.name}`);
 
-                    // 1. تحويل الملف لنص
                     const base64 = await readFileAsBase64(file);
                     const isLarge = base64.length > CHUNK_SIZE;
                     
-                    // إنشاء مرجع لملف جديد داخل المصروف
                     const fileDocRef = expenseRef.collection('files').doc();
 
                     if(!isLarge) {
-                        // ملف صغير: حفظ مباشر
-                        await fileDocRef.set({ 
-                            name: file.name, 
-                            type: file.type, 
-                            data: base64, 
-                            isChunked: false 
-                        });
+                        await fileDocRef.set({ name: file.name, type: file.type, data: base64, isChunked: false });
                     } else {
-                        // ملف كبير: تقطيع
-                        await fileDocRef.set({ 
-                            name: file.name, 
-                            type: file.type, 
-                            isChunked: true, 
-                            totalSize: base64.length 
-                        });
-
+                        await fileDocRef.set({ name: file.name, type: file.type, isChunked: true, totalSize: base64.length });
                         const chunks = [];
                         for (let k = 0; k < base64.length; k += CHUNK_SIZE) {
                             chunks.push(base64.substring(k, k + CHUNK_SIZE));
                         }
-
                         const batch = db.batch();
                         chunks.forEach((chunk, idx) => {
-                            // استخدام معرفات مرتبة لضمان الترتيب
                             const chunkRef = fileDocRef.collection('chunks').doc(idx.toString().padStart(4, '0'));
                             batch.set(chunkRef, { data: chunk, index: idx });
                         });
                         await batch.commit();
                     }
 
-                    // إضافة للملخص
                     filesSummary.push({
                         id: fileDocRef.id,
                         name: file.name,
@@ -401,7 +484,6 @@
                     });
                 }
 
-                // تحديث البيانات النهائية للمصروف
                 await expenseRef.update({
                     amount: Number(amt),
                     name: name,
@@ -420,57 +502,6 @@
                 console.error(e);
                 btn.disabled = false;
                 btn.innerText = "حاول مرة أخرى";
-            }
-        }
-
-        // ============================================
-        // 4. التحميل والتجميع (Download/View)
-        // ============================================
-        async function downloadFile(expenseId, fileId, fileName, isChunked) {
-            const btn = event.target.closest('button');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = `⏳ جاري التحميل...`;
-            btn.disabled = true;
-
-            try {
-                const fileDocRef = db.collection("projects").doc(currentProjectId)
-                                    .collection("expenses").doc(expenseId)
-                                    .collection("files").doc(fileId);
-
-                let finalBase64 = "";
-
-                if(!isChunked) {
-                    const doc = await fileDocRef.get();
-                    finalBase64 = doc.data().data;
-                } else {
-                    // تجميع القطع
-                    const chunksSnap = await fileDocRef.collection('chunks').orderBy('index').get();
-                    chunksSnap.forEach(chunkDoc => {
-                        finalBase64 += chunkDoc.data().data;
-                    });
-                }
-
-                // إنشاء رابط وتنزيل/فتح
-                fetch(finalBase64).then(res => res.blob()).then(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = fileName;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    
-                    // إذا كان صورة أو PDF، نحاول فتحه أيضاً
-                    if(fileName.match(/\.(jpeg|jpg|png|pdf)$/i)) {
-                        window.open(url, '_blank');
-                    }
-                });
-
-            } catch(e) {
-                alert("فشل التحميل: " + e.message);
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
             }
         }
 

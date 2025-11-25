@@ -3,42 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مدير مصاريف المحل</title>
+    <title>مدير المصاريف (الإصدار الذهبي)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <!-- مكتبات فايربيس (Firestore فقط - للأداء والاستقرار) -->
+    <!-- مكتبات فايربيس (Firestore فقط - لا مشاكل تخزين) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
     <style>
-        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; touch-action: manipulation; }
         .loader { border: 3px solid #e2e8f0; border-top: 3px solid #f59e0b; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .cat-btn { border: 2px solid #f1f5f9; transition: all 0.2s; }
         .cat-btn.selected { border-color: #f59e0b; background-color: #fef3c7; transform: scale(0.98); }
-        .progress-bar { transition: width 0.2s ease; }
-        
-        /* تنسيق المعاينة */
-        #lightbox { transition: opacity 0.3s; }
-        .lightbox-content { max-height: 90vh; max-width: 95vw; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .lightbox-img { max-height: 80vh; max-width: 100%; object-fit: contain; border-radius: 8px; }
+        .progress-bar { transition: width 0.1s linear; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 pb-24 select-none">
 
-    <!-- 1. الشاشة الرئيسية: قائمة المشاريع -->
+    <!-- 1. الشاشة الرئيسية -->
     <div id="projects-view" class="p-6 max-w-md mx-auto min-h-screen fade-in">
         <div class="flex justify-between items-center mb-8 mt-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-gray-900">مشاريعي</h1>
-                <p class="text-gray-500 text-sm">نظام إدارة المصاريف (النسخة المستقرة)</p>
+                <p class="text-gray-500 text-sm">النسخة الشاملة (V10)</p>
             </div>
-            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-yellow-500 font-bold text-xl shadow-sm border border-gray-200">
-                🏢
-            </div>
+            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-yellow-500 font-bold text-xl shadow-sm border border-gray-200">🏢</div>
         </div>
 
         <div id="projects-list" class="space-y-4">
@@ -51,7 +43,7 @@
         </div>
     </div>
 
-    <!-- 2. شاشة تفاصيل المشروع والمصاريف -->
+    <!-- 2. شاشة المصاريف -->
     <div id="expenses-view" class="hidden min-h-screen bg-gray-50 fade-in">
         <header class="bg-yellow-500 text-white p-6 rounded-b-3xl shadow-lg sticky top-0 z-20">
             <button onclick="backToProjects()" class="absolute top-6 right-6 p-2 bg-white/20 rounded-lg backdrop-blur-sm active:scale-90 transition hover:bg-white/30">
@@ -79,9 +71,7 @@
         </button>
     </div>
 
-    <!-- 3. النوافذ المنبثقة (Modals) -->
-    
-    <!-- مودال مشروع جديد -->
+    <!-- 3. النوافذ المنبثقة -->
     <div id="newProjectModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity">
         <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-100 transition-transform">
             <h3 class="text-xl font-bold text-gray-800 mb-4">اسم المشروع الجديد</h3>
@@ -91,7 +81,6 @@
         </div>
     </div>
 
-    <!-- مودال إضافة/تعديل مصروف -->
     <div id="addExpenseModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 backdrop-blur-sm">
         <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[90vh] sm:h-auto overflow-y-auto relative transition-transform transform translate-y-0">
             <div class="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-2 border-b border-gray-100">
@@ -102,7 +91,6 @@
             <input type="hidden" id="editing-expense-id">
 
             <div class="space-y-5">
-                <!-- المبلغ -->
                 <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-200">
                     <label class="text-xs text-yellow-700 font-bold block mb-1">المبلغ</label>
                     <div class="flex items-center">
@@ -111,13 +99,11 @@
                     </div>
                 </div>
 
-                <!-- البيان -->
                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <label class="text-xs text-gray-500 font-bold block mb-1">البيان (الغرض)</label>
                     <input type="text" id="exp-name" placeholder="اكتب اسم الغرض..." class="w-full bg-transparent outline-none text-lg font-bold text-gray-800 placeholder-gray-400">
                 </div>
 
-                <!-- التصنيفات -->
                 <div class="grid grid-cols-2 gap-3">
                     <div onclick="selectCategory(this, 'equipment')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">🥘</div><div class="text-xs font-bold text-gray-600">معدات</div></div>
                     <div onclick="selectCategory(this, 'goods')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">📦</div><div class="text-xs font-bold text-gray-600">بضاعة</div></div>
@@ -126,34 +112,29 @@
                 </div>
                 <input type="hidden" id="exp-cat" value="other">
 
-                <!-- عرض المرفقات الحالية (للحذف) -->
                 <div id="current-attachments-area" class="hidden">
                     <label class="text-xs text-gray-500 font-bold block mb-2">المرفقات الحالية:</label>
                     <div id="current-attachments-list" class="space-y-2"></div>
                 </div>
 
-                <!-- رفع ملفات جديدة -->
                 <div class="mt-2">
                     <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition relative group bg-white">
-                        <!-- يقبل الصور فقط حالياً لضمان العمل بدون مشاكل -->
-                        <input type="file" id="exp-files" class="hidden" multiple accept="image/*" onchange="handleFileSelect(this)">
+                        <!-- يقبل جميع أنواع الملفات -->
+                        <input type="file" id="exp-files" class="hidden" multiple accept="*/*" onchange="handleFileSelect(this)">
                         <div id="upload-placeholder">
                             <div class="mx-auto w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </div>
-                            <span class="text-sm font-bold text-gray-700">إضافة صور الفواتير</span>
-                            <p class="text-xs text-gray-400 mt-1">اضغط هنا للتصوير أو اختيار صور</p>
+                            <span class="text-sm font-bold text-gray-700">إضافة ملفات (صور، PDF، Word)</span>
+                            <p class="text-xs text-gray-400 mt-1">اضغط هنا للاختيار</p>
                         </div>
                     </label>
                     <div id="selected-files-list" class="mt-3 space-y-2 hidden"></div>
                     
-                    <!-- حالة الرفع -->
                     <div id="status-bar" class="hidden mt-4 text-center bg-gray-50 p-3 rounded-lg border border-gray-100">
                         <div class="text-xs font-bold text-blue-600 mb-2" id="status-text">جاري المعالجة...</div>
                         <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                            <div id="progress-bar" class="bg-blue-600 h-2 rounded-full progress-bar relative overflow-hidden" style="width: 0%">
-                                <div class="absolute top-0 left-0 bottom-0 right-0 bg-white/20 w-full animate-pulse"></div>
-                            </div>
+                            <div id="progress-bar" class="bg-blue-600 h-2 rounded-full progress-bar" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>
@@ -165,20 +146,10 @@
         </div>
     </div>
 
-    <!-- 4. عارض الصور (Lightbox) -->
-    <div id="lightbox" class="fixed inset-0 bg-black/95 hidden z-[60] flex items-center justify-center backdrop-blur-sm" onclick="closeLightbox()">
-        <button class="absolute top-4 right-4 text-white bg-white/10 p-3 rounded-full z-10 hover:bg-red-500 hover:text-white transition backdrop-blur-md">✕ إغلاق</button>
-        <div class="lightbox-content" onclick="event.stopPropagation()">
-            <img id="lightbox-img" src="" class="lightbox-img shadow-2xl">
-        </div>
-        <a id="lightbox-download" href="#" download="image.jpg" class="absolute bottom-10 bg-white text-gray-900 px-6 py-3 rounded-full font-bold shadow-lg hover:bg-gray-200 transition flex items-center gap-2 z-20" onclick="event.stopPropagation()">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4 4m4-4v12" /></svg>
-            حفظ الصورة
-        </a>
-    </div>
-
     <script>
-        // إعدادات فايربيس (Firestore فقط - بدون Storage لتفادي المشاكل)
+        // ============================================================
+        // إعدادات فايربيس (Firestore فقط - لا مشاكل تخزين، لا دفع)
+        // ============================================================
         const firebaseConfig = {
           apiKey: "AIzaSyCRbN9PDuoqZ60BAU79S-cY_ka9dtLerL4",
           authDomain: "baba-app-final.firebaseapp.com",
@@ -196,10 +167,10 @@
         let unsubscribe = null;
         let selectedFilesRaw = [];
         let currentAttachments = [];
+        // حجم القطعة للتقطيع (800 كيلو بايت لتفادي حد 1 ميجا)
+        const CHUNK_SIZE = 800 * 1024; 
 
-        // ============================================
-        // 1. إدارة المشاريع (مع الحذف)
-        // ============================================
+        // 1. إدارة المشاريع
         db.collection("projects").orderBy("createdAt", "desc").onSnapshot(snapshot => {
             const list = document.getElementById('projects-list');
             list.innerHTML = "";
@@ -228,7 +199,7 @@
 
         async function deleteProject(e, id, name) {
             e.stopPropagation();
-            if(confirm(`هل أنت متأكد تماماً من حذف مشروع "${name}"؟\n\nسيتم حذف جميع البيانات والمصاريف المسجلة فيه ولا يمكن التراجع.`)) {
+            if(confirm(`هل أنت متأكد تماماً من حذف مشروع "${name}"؟`)) {
                 await db.collection("projects").doc(id).delete();
             }
         }
@@ -240,9 +211,7 @@
             .then(() => { closeModal('newProjectModal'); document.getElementById('new-project-name').value = ""; });
         }
 
-        // ============================================
-        // 2. إدارة المصاريف (عرض + تعديل + حذف + معاينة)
-        // ============================================
+        // 2. إدارة المصاريف
         function openProject(id, name, total) {
             currentProjectId = id;
             document.getElementById('projects-view').classList.add('hidden');
@@ -277,17 +246,24 @@
                     if(data.category === 'decor') { icon = '🎨'; color = 'bg-purple-50 text-purple-600'; }
                     if(data.category === 'goods') { icon = '📦'; color = 'bg-blue-50 text-blue-600'; }
 
-                    // عرض المرفقات (صور فقط)
+                    // عرض المرفقات (بأيقونات ذكية)
                     let attachmentsHTML = '';
-                    const images = data.attachments || [];
+                    const files = data.filesSummary || [];
                     
-                    if(images.length > 0) {
-                        attachmentsHTML = `<div class="flex gap-2 mt-3 overflow-x-auto pb-2 no-scrollbar">`;
-                        images.forEach((img, idx) => {
+                    if(files.length > 0) {
+                        attachmentsHTML = `<div class="flex flex-wrap gap-2 mt-3">`;
+                        files.forEach((file) => {
+                            let typeIcon = '📄';
+                            if(file.type.includes('image')) typeIcon = '🖼️';
+                            if(file.type.includes('pdf')) typeIcon = '📕';
+                            if(file.type.includes('word') || file.type.includes('doc')) typeIcon = '📝';
+                            if(file.type.includes('sheet') || file.type.includes('excel')) typeIcon = '📊';
+
                             attachmentsHTML += `
-                            <div onclick="openLightbox('${img.data}')" class="relative w-16 h-16 rounded-lg border border-gray-200 overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition">
-                                <img src="${img.data}" class="w-full h-full object-cover">
-                            </div>`;
+                            <button onclick="downloadFile('${expenseId}', '${file.id}', '${file.name}', ${file.isChunked})" class="flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">
+                                <span>${typeIcon}</span>
+                                <span class="truncate max-w-[100px]">${file.name}</span>
+                            </button>`;
                         });
                         attachmentsHTML += `</div>`;
                     }
@@ -328,45 +304,179 @@
         }
 
         // ============================================
-        // 3. منطق الصور (الضغط والتحويل) - السر الحقيقي هنا
+        // 3. نظام التقطيع الذكي (للملفات الكبيرة)
         // ============================================
-        function compressImage(file) {
+        function readFileAsBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        // نحدد أقصى أبعاد للصورة (800px كافية جداً للموبايل)
-                        const MAX_WIDTH = 800;
-                        const MAX_HEIGHT = 800;
-                        let width = img.width;
-                        let height = img.height;
-
-                        if (width > height) {
-                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                        } else {
-                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-                        }
-
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        // ضغط الجودة إلى 60% (يقلل الحجم بشكل هائل مع الحفاظ على الوضوح)
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                        resolve(dataUrl);
-                    };
-                    img.onerror = reject;
-                };
+                reader.onload = (e) => resolve(e.target.result);
                 reader.onerror = reject;
+                reader.readAsDataURL(file);
             });
         }
 
+        async function saveExpense() {
+            const btn = document.getElementById('save-btn');
+            const editId = document.getElementById('editing-expense-id').value;
+            const amt = document.getElementById('exp-amount').value;
+            const name = document.getElementById('exp-name').value;
+            const cat = document.getElementById('exp-cat').value;
+
+            if(!amt || !name) return alert("الرجاء تعبئة البيانات");
+            
+            btn.innerText = "جاري المعالجة...";
+            btn.disabled = true;
+            document.getElementById('status-bar').classList.remove('hidden');
+            
+            try {
+                let expenseRef;
+                let filesSummary = [];
+
+                // إذا كان تعديل، نجلب المرفقات القديمة أولاً
+                if (editId) {
+                    expenseRef = db.collection("projects").doc(currentProjectId).collection("expenses").doc(editId);
+                    filesSummary = currentAttachments.filter(f => !f.deleted);
+                } else {
+                    // إنشاء مستند جديد للمصروف
+                    expenseRef = await db.collection("projects").doc(currentProjectId).collection("expenses").add({
+                        amount: Number(amt),
+                        name: name,
+                        category: cat,
+                        date: new Date(),
+                        filesSummary: [] // مؤقتاً
+                    });
+                }
+
+                // معالجة الملفات الجديدة
+                for(let i=0; i < selectedFilesRaw.length; i++) {
+                    const file = selectedFilesRaw[i];
+                    const progress = ((i / selectedFilesRaw.length) * 100);
+                    updateProgress(progress, `جاري رفع: ${file.name}`);
+
+                    // 1. تحويل الملف لنص
+                    const base64 = await readFileAsBase64(file);
+                    const isLarge = base64.length > CHUNK_SIZE;
+                    
+                    // إنشاء مرجع لملف جديد داخل المصروف
+                    const fileDocRef = expenseRef.collection('files').doc();
+
+                    if(!isLarge) {
+                        // ملف صغير: حفظ مباشر
+                        await fileDocRef.set({ 
+                            name: file.name, 
+                            type: file.type, 
+                            data: base64, 
+                            isChunked: false 
+                        });
+                    } else {
+                        // ملف كبير: تقطيع
+                        await fileDocRef.set({ 
+                            name: file.name, 
+                            type: file.type, 
+                            isChunked: true, 
+                            totalSize: base64.length 
+                        });
+
+                        const chunks = [];
+                        for (let k = 0; k < base64.length; k += CHUNK_SIZE) {
+                            chunks.push(base64.substring(k, k + CHUNK_SIZE));
+                        }
+
+                        const batch = db.batch();
+                        chunks.forEach((chunk, idx) => {
+                            // استخدام معرفات مرتبة لضمان الترتيب
+                            const chunkRef = fileDocRef.collection('chunks').doc(idx.toString().padStart(4, '0'));
+                            batch.set(chunkRef, { data: chunk, index: idx });
+                        });
+                        await batch.commit();
+                    }
+
+                    // إضافة للملخص
+                    filesSummary.push({
+                        id: fileDocRef.id,
+                        name: file.name,
+                        type: file.type,
+                        isChunked: isLarge,
+                        uploadDate: new Date().toISOString()
+                    });
+                }
+
+                // تحديث البيانات النهائية للمصروف
+                await expenseRef.update({
+                    amount: Number(amt),
+                    name: name,
+                    category: cat,
+                    filesSummary: filesSummary
+                });
+
+                updateProgress(100, "تم الحفظ!");
+                setTimeout(() => {
+                    closeModal('addExpenseModal');
+                    resetModal();
+                }, 500);
+
+            } catch(e) {
+                alert("حدث خطأ: " + e.message);
+                console.error(e);
+                btn.disabled = false;
+                btn.innerText = "حاول مرة أخرى";
+            }
+        }
+
+        // ============================================
+        // 4. التحميل والتجميع (Download/View)
+        // ============================================
+        async function downloadFile(expenseId, fileId, fileName, isChunked) {
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `⏳ جاري التحميل...`;
+            btn.disabled = true;
+
+            try {
+                const fileDocRef = db.collection("projects").doc(currentProjectId)
+                                    .collection("expenses").doc(expenseId)
+                                    .collection("files").doc(fileId);
+
+                let finalBase64 = "";
+
+                if(!isChunked) {
+                    const doc = await fileDocRef.get();
+                    finalBase64 = doc.data().data;
+                } else {
+                    // تجميع القطع
+                    const chunksSnap = await fileDocRef.collection('chunks').orderBy('index').get();
+                    chunksSnap.forEach(chunkDoc => {
+                        finalBase64 += chunkDoc.data().data;
+                    });
+                }
+
+                // إنشاء رابط وتنزيل/فتح
+                fetch(finalBase64).then(res => res.blob()).then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // إذا كان صورة أو PDF، نحاول فتحه أيضاً
+                    if(fileName.match(/\.(jpeg|jpg|png|pdf)$/i)) {
+                        window.open(url, '_blank');
+                    }
+                });
+
+            } catch(e) {
+                alert("فشل التحميل: " + e.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================
+        // 5. دوال الواجهة
+        // ============================================
         function handleFileSelect(input) {
             const files = input.files;
             const list = document.getElementById('selected-files-list');
@@ -379,15 +489,16 @@
             for(let i=0; i<files.length; i++) {
                 selectedFilesRaw.push(files[i]);
                 const div = document.createElement('div');
+                let icon = '📄';
+                if(files[i].type.includes('image')) icon = '🖼️';
+                if(files[i].type.includes('pdf')) icon = '📕';
+                
                 div.className = 'flex justify-between items-center bg-blue-50 p-3 rounded-xl text-sm border border-blue-100 animate-fade-in';
-                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">🖼️ ${files[i].name}</span><span class="text-xs text-gray-400">جاهز</span>`;
+                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">${icon} ${files[i].name}</span><span class="text-xs text-gray-400">جاهز</span>`;
                 list.appendChild(div);
             }
         }
 
-        // ============================================
-        // 4. الحفظ والتعديل
-        // ============================================
         function prepareAddExpense() {
             resetModal();
             document.getElementById('modal-title').innerText = "إضافة مصروف";
@@ -404,26 +515,24 @@
             document.getElementById('exp-cat').value = category;
             document.getElementById('save-btn').innerText = "حفظ التعديلات";
 
-            // تحديد التصنيف
             document.querySelectorAll('.cat-btn').forEach(btn => {
                 if(btn.innerText.includes(category === 'equipment' ? 'معدات' : category === 'goods' ? 'بضاعة' : category === 'decor' ? 'ديكور' : 'حكومي')) {
                     selectCategory(btn, category);
                 }
             });
 
-            // جلب المرفقات الحالية
             const doc = await db.collection("projects").doc(currentProjectId).collection("expenses").doc(id).get();
-            currentAttachments = doc.data().attachments || [];
+            const data = doc.data();
+            currentAttachments = data.filesSummary || [];
             
             if(currentAttachments.length > 0) {
                 const listDiv = document.getElementById('current-attachments-list');
                 document.getElementById('current-attachments-area').classList.remove('hidden');
                 listDiv.innerHTML = "";
-                currentAttachments.forEach((img, idx) => {
+                currentAttachments.forEach((file, idx) => {
                     listDiv.innerHTML += `
                     <div class="flex justify-between items-center bg-white border border-gray-200 p-2 rounded-xl text-sm" id="curr-file-${idx}">
-                        <img src="${img.data}" class="w-8 h-8 rounded object-cover border border-gray-100">
-                        <span class="text-xs text-gray-500 font-mono ml-2">صورة محفوظة</span>
+                        <span class="truncate w-40 font-bold text-gray-600">📎 ${file.name}</span>
                         <button onclick="markDeleted(${idx})" class="text-red-500 text-xs font-bold px-3 py-1 bg-red-50 rounded-lg hover:bg-red-100">حذف</button>
                     </div>`;
                 });
@@ -439,72 +548,6 @@
             currentAttachments[index].deleted = true;
         }
 
-        async function saveExpense() {
-            const btn = document.getElementById('save-btn');
-            const editId = document.getElementById('editing-expense-id').value;
-            const amt = document.getElementById('exp-amount').value;
-            const name = document.getElementById('exp-name').value;
-            const cat = document.getElementById('exp-cat').value;
-
-            if(!amt || !name) return alert("الرجاء تعبئة البيانات");
-            
-            btn.innerText = "جاري المعالجة والضغط...";
-            btn.disabled = true;
-            document.getElementById('status-bar').classList.remove('hidden');
-            
-            try {
-                let newAttachments = [];
-
-                // 1. ضغط الصور الجديدة
-                if (selectedFilesRaw.length > 0) {
-                    for(let i=0; i < selectedFilesRaw.length; i++) {
-                        updateProgress(((i+1)/selectedFilesRaw.length)*50, `جاري ضغط الصورة ${i+1}...`);
-                        const base64 = await compressImage(selectedFilesRaw[i]);
-                        newAttachments.push({ data: base64 });
-                    }
-                }
-
-                // 2. دمج مع القديم (في حال التعديل)
-                let finalAttachments = [];
-                if (editId) {
-                    finalAttachments = currentAttachments.filter(f => !f.deleted).concat(newAttachments);
-                } else {
-                    finalAttachments = newAttachments;
-                }
-
-                updateProgress(80, "جاري الحفظ في قاعدة البيانات...");
-
-                const expenseData = {
-                    amount: Number(amt),
-                    name: name,
-                    category: cat,
-                    attachments: finalAttachments
-                };
-
-                if (editId) {
-                    await db.collection("projects").doc(currentProjectId).collection("expenses").doc(editId).update(expenseData);
-                } else {
-                    expenseData.date = new Date();
-                    await db.collection("projects").doc(currentProjectId).collection("expenses").add(expenseData);
-                }
-
-                updateProgress(100, "تم بنجاح!");
-                setTimeout(() => {
-                    closeModal('addExpenseModal');
-                    resetModal();
-                }, 500);
-
-            } catch(e) {
-                alert("حدث خطأ: " + e.message);
-                console.error(e);
-                btn.disabled = false;
-                btn.innerText = "حاول مرة أخرى";
-            }
-        }
-
-        // ============================================
-        // 5. دوال مساعدة وواجهة
-        // ============================================
         function resetModal() {
             document.getElementById('editing-expense-id').value = "";
             document.getElementById('exp-amount').value = "";
@@ -530,19 +573,6 @@
             if(confirm("حذف هذا المصروف؟")) {
                 db.collection("projects").doc(currentProjectId).collection("expenses").doc(id).delete();
             }
-        }
-
-        function openLightbox(src) {
-            const lb = document.getElementById('lightbox');
-            const img = document.getElementById('lightbox-img');
-            const dl = document.getElementById('lightbox-download');
-            lb.classList.remove('hidden');
-            img.src = src;
-            dl.href = src;
-        }
-
-        function closeLightbox() {
-            document.getElementById('lightbox').classList.add('hidden');
         }
 
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }

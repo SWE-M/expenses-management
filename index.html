@@ -3,48 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مدير المشاريع الشامل</title>
+    <title>مدير مصاريف المحل</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <!-- مكتبات فايربيس -->
+    <!-- مكتبات فايربيس (Firestore فقط - للأداء والاستقرار) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
 
     <style>
-        body { font-family: 'Tajawal', sans-serif; background-color: #f1f5f9; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-        .loader { border: 3px solid #e2e8f0; border-top: 3px solid #eab308; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
+        body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        .loader { border: 3px solid #e2e8f0; border-top: 3px solid #f59e0b; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .cat-btn.selected { border-color: #eab308; background-color: #fefce8; transform: scale(0.98); }
-        .progress-bar { transition: width 0.1s linear; }
+        .cat-btn { border: 2px solid #f1f5f9; transition: all 0.2s; }
+        .cat-btn.selected { border-color: #f59e0b; background-color: #fef3c7; transform: scale(0.98); }
+        .progress-bar { transition: width 0.2s ease; }
         
-        /* تنسيق معرض الصور المصغر */
-        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; margin-top: 10px; }
-        .gallery-item { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; cursor: pointer; background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s; }
-        .gallery-item:hover { transform: scale(1.05); border-color: #cbd5e1; }
-        .gallery-item img { width: 100%; height: 100%; object-fit: cover; }
-        .gallery-date { font-size: 8px; color: #64748b; text-align: center; margin-top: 4px; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 0 2px; }
-        
-        /* تنسيق العارض المكبر (Lightbox) */
+        /* تنسيق المعاينة */
         #lightbox { transition: opacity 0.3s; }
         .lightbox-content { max-height: 90vh; max-width: 95vw; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-        .lightbox-img { max-height: 80vh; max-width: 100%; object-fit: contain; }
-        .lightbox-iframe { width: 90vw; height: 85vh; background: white; border-radius: 8px; border: none; }
+        .lightbox-img { max-height: 80vh; max-width: 100%; object-fit: contain; border-radius: 8px; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 pb-20 select-none">
+<body class="bg-gray-50 text-gray-800 pb-24 select-none">
 
-    <!-- 1. الشاشة الرئيسية -->
+    <!-- 1. الشاشة الرئيسية: قائمة المشاريع -->
     <div id="projects-view" class="p-6 max-w-md mx-auto min-h-screen fade-in">
         <div class="flex justify-between items-center mb-8 mt-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-gray-900">مشاريعي</h1>
-                <p class="text-gray-500 text-sm">الإصدار الشامل (V9)</p>
+                <p class="text-gray-500 text-sm">نظام إدارة المصاريف (النسخة المستقرة)</p>
             </div>
-            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-yellow-500 font-bold text-xl shadow-md border border-gray-100">
+            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-yellow-500 font-bold text-xl shadow-sm border border-gray-200">
                 🏢
             </div>
         </div>
@@ -53,133 +45,140 @@
             <div class="flex justify-center p-10"><div class="loader"></div></div>
         </div>
 
-        <div onclick="openModal('newProjectModal')" class="mt-6 border-2 border-dashed border-gray-300 rounded-2xl p-6 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-yellow-500 hover:text-yellow-500 transition h-32 bg-white/50 active:scale-95 shadow-sm">
+        <div onclick="openModal('newProjectModal')" class="mt-6 border-2 border-dashed border-gray-300 rounded-2xl p-6 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-yellow-500 hover:text-yellow-500 transition h-32 bg-white active:scale-95 shadow-sm">
             <span class="text-4xl mb-1">+</span>
             <span class="font-bold text-sm">مشروع جديد</span>
         </div>
     </div>
 
-    <!-- 2. شاشة المصاريف -->
+    <!-- 2. شاشة تفاصيل المشروع والمصاريف -->
     <div id="expenses-view" class="hidden min-h-screen bg-gray-50 fade-in">
-        <header class="bg-yellow-500 text-white p-6 rounded-b-3xl shadow-xl sticky top-0 z-20">
-            <button onclick="backToProjects()" class="absolute top-6 right-6 p-2 bg-white/20 rounded-lg backdrop-blur-sm active:scale-90">
+        <header class="bg-yellow-500 text-white p-6 rounded-b-3xl shadow-lg sticky top-0 z-20">
+            <button onclick="backToProjects()" class="absolute top-6 right-6 p-2 bg-white/20 rounded-lg backdrop-blur-sm active:scale-90 transition hover:bg-white/30">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
             </button>
             <div class="mt-4">
                 <h1 id="current-project-name" class="text-2xl font-bold truncate pl-8">...</h1>
                 <div class="mt-2 flex items-baseline gap-2">
-                    <h2 class="text-5xl font-extrabold" id="current-project-total">0</h2>
-                    <span class="text-xl opacity-90">ريال</span>
+                    <h2 class="text-5xl font-extrabold tracking-tight" id="current-project-total">0</h2>
+                    <span class="text-xl opacity-90 font-medium">ريال</span>
                 </div>
             </div>
         </header>
 
         <div class="container mx-auto px-4 mt-6 pb-24">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-bold text-gray-700">سجل المصروفات</h3>
-                <span id="expense-count" class="text-xs bg-gray-200 px-2 py-1 rounded-full text-gray-600">0</span>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-700 text-lg">سجل العمليات</h3>
+                <span id="expense-count" class="text-xs bg-gray-200 px-3 py-1 rounded-full text-gray-600 font-bold">0</span>
             </div>
             <div id="expenses-list" class="space-y-3 pb-20"></div>
         </div>
 
-        <button onclick="prepareAddExpense()" class="fixed bottom-6 left-6 bg-gray-900 text-white w-16 h-16 rounded-full shadow-2xl z-30 flex items-center justify-center border-4 border-white active:scale-90 transition">
+        <button onclick="prepareAddExpense()" class="fixed bottom-6 left-6 bg-gray-900 text-white w-16 h-16 rounded-full shadow-2xl z-30 flex items-center justify-center border-4 border-white active:scale-90 transition hover:bg-gray-800">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
         </button>
     </div>
 
-    <!-- 3. نوافذ المودال -->
+    <!-- 3. النوافذ المنبثقة (Modals) -->
     
-    <div id="newProjectModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">اسم المشروع</h3>
-            <input type="text" id="new-project-name" placeholder="مثلاً: بوفيه الحي" class="w-full p-4 bg-gray-50 rounded-xl outline-none text-lg font-bold text-gray-800 mb-4 border focus:border-yellow-500">
-            <button onclick="createNewProject()" class="w-full py-3 bg-yellow-500 text-white rounded-xl font-bold shadow-lg">إنشاء</button>
-            <button onclick="closeModal('newProjectModal')" class="w-full mt-2 py-3 text-gray-500 font-bold">إلغاء</button>
+    <!-- مودال مشروع جديد -->
+    <div id="newProjectModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl transform scale-100 transition-transform">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">اسم المشروع الجديد</h3>
+            <input type="text" id="new-project-name" placeholder="مثلاً: بوفيه الحي" class="w-full p-4 bg-gray-50 rounded-xl outline-none text-lg font-bold text-gray-800 mb-6 border-2 border-transparent focus:border-yellow-500 transition-colors bg-gray-100">
+            <button onclick="createNewProject()" class="w-full py-3 bg-yellow-500 text-white rounded-xl font-bold shadow-lg hover:bg-yellow-600 active:scale-95 transition-transform">إنشاء</button>
+            <button onclick="closeModal('newProjectModal')" class="w-full mt-3 py-3 text-gray-500 font-bold hover:text-gray-700">إلغاء</button>
         </div>
     </div>
 
+    <!-- مودال إضافة/تعديل مصروف -->
     <div id="addExpenseModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[90vh] sm:h-auto overflow-y-auto relative">
-            <div class="flex justify-between items-center mb-6">
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[90vh] sm:h-auto overflow-y-auto relative transition-transform transform translate-y-0">
+            <div class="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-2 border-b border-gray-100">
                 <h3 class="text-xl font-bold text-gray-800" id="modal-title">إضافة مصروف</h3>
-                <button onclick="closeModal('addExpenseModal')" class="bg-gray-100 p-2 rounded-full text-gray-600">✕</button>
+                <button onclick="closeModal('addExpenseModal')" class="bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-gray-200">✕</button>
             </div>
             
             <input type="hidden" id="editing-expense-id">
 
-            <div class="space-y-4">
-                <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-100">
-                    <label class="text-xs text-yellow-600 font-bold block mb-1">المبلغ</label>
+            <div class="space-y-5">
+                <!-- المبلغ -->
+                <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-200">
+                    <label class="text-xs text-yellow-700 font-bold block mb-1">المبلغ</label>
                     <div class="flex items-center">
-                        <input type="number" id="exp-amount" placeholder="0" class="w-full bg-transparent text-4xl font-extrabold text-gray-900 outline-none" inputmode="numeric">
-                        <span class="text-gray-400 font-bold">ريال</span>
+                        <input type="number" id="exp-amount" placeholder="0" class="w-full bg-transparent text-4xl font-extrabold text-gray-900 outline-none placeholder-gray-400" inputmode="numeric">
+                        <span class="text-gray-500 font-bold text-lg">ريال</span>
                     </div>
                 </div>
 
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                    <label class="text-xs text-gray-500 font-bold block mb-1">البيان</label>
-                    <input type="text" id="exp-name" placeholder="اكتب اسم الغرض..." class="w-full bg-transparent outline-none text-lg font-bold text-gray-800">
+                <!-- البيان -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                    <label class="text-xs text-gray-500 font-bold block mb-1">البيان (الغرض)</label>
+                    <input type="text" id="exp-name" placeholder="اكتب اسم الغرض..." class="w-full bg-transparent outline-none text-lg font-bold text-gray-800 placeholder-gray-400">
                 </div>
 
-                <div class="grid grid-cols-2 gap-2">
-                    <div onclick="selectCategory(this, 'equipment')" class="cat-btn p-3 rounded-xl border-2 border-gray-100 text-center cursor-pointer transition"><div class="text-xl mb-1">🥘</div><div class="text-xs font-bold text-gray-600">معدات</div></div>
-                    <div onclick="selectCategory(this, 'goods')" class="cat-btn p-3 rounded-xl border-2 border-gray-100 text-center cursor-pointer transition"><div class="text-xl mb-1">📦</div><div class="text-xs font-bold text-gray-600">بضاعة</div></div>
-                    <div onclick="selectCategory(this, 'decor')" class="cat-btn p-3 rounded-xl border-2 border-gray-100 text-center cursor-pointer transition"><div class="text-xl mb-1">🎨</div><div class="text-xs font-bold text-gray-600">ديكور</div></div>
-                    <div onclick="selectCategory(this, 'gov')" class="cat-btn p-3 rounded-xl border-2 border-gray-100 text-center cursor-pointer transition"><div class="text-xl mb-1">⚖️</div><div class="text-xs font-bold text-gray-600">حكومي</div></div>
+                <!-- التصنيفات -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div onclick="selectCategory(this, 'equipment')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">🥘</div><div class="text-xs font-bold text-gray-600">معدات</div></div>
+                    <div onclick="selectCategory(this, 'goods')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">📦</div><div class="text-xs font-bold text-gray-600">بضاعة</div></div>
+                    <div onclick="selectCategory(this, 'decor')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">🎨</div><div class="text-xs font-bold text-gray-600">ديكور</div></div>
+                    <div onclick="selectCategory(this, 'gov')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">⚖️</div><div class="text-xs font-bold text-gray-600">حكومي</div></div>
                 </div>
                 <input type="hidden" id="exp-cat" value="other">
 
+                <!-- عرض المرفقات الحالية (للحذف) -->
                 <div id="current-attachments-area" class="hidden">
                     <label class="text-xs text-gray-500 font-bold block mb-2">المرفقات الحالية:</label>
                     <div id="current-attachments-list" class="space-y-2"></div>
                 </div>
 
+                <!-- رفع ملفات جديدة -->
                 <div class="mt-2">
-                    <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:bg-gray-50 transition relative group">
-                        <input type="file" id="exp-files" class="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xlsx,.xls" onchange="handleFileSelect(this)">
+                    <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition relative group bg-white">
+                        <!-- يقبل الصور فقط حالياً لضمان العمل بدون مشاكل -->
+                        <input type="file" id="exp-files" class="hidden" multiple accept="image/*" onchange="handleFileSelect(this)">
                         <div id="upload-placeholder">
-                            <span class="text-sm font-bold text-gray-500">📎 إضافة ملفات</span>
-                            <p class="text-xs text-gray-400 mt-1">صور، PDF، Word، Excel</p>
+                            <div class="mx-auto w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            </div>
+                            <span class="text-sm font-bold text-gray-700">إضافة صور الفواتير</span>
+                            <p class="text-xs text-gray-400 mt-1">اضغط هنا للتصوير أو اختيار صور</p>
                         </div>
                     </label>
-                    <div id="selected-files-list" class="mt-2 space-y-2 hidden"></div>
+                    <div id="selected-files-list" class="mt-3 space-y-2 hidden"></div>
                     
-                    <div id="status-bar" class="hidden mt-3 text-center">
-                        <div class="flex justify-between text-xs mb-1">
-                            <span id="status-text" class="font-bold text-blue-600">جاري المعالجة...</span>
-                            <span id="upload-percentage" class="font-bold text-gray-500">0%</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5">
-                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar" style="width: 0%"></div>
+                    <!-- حالة الرفع -->
+                    <div id="status-bar" class="hidden mt-4 text-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        <div class="text-xs font-bold text-blue-600 mb-2" id="status-text">جاري المعالجة...</div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div id="progress-bar" class="bg-blue-600 h-2 rounded-full progress-bar relative overflow-hidden" style="width: 0%">
+                                <div class="absolute top-0 left-0 bottom-0 right-0 bg-white/20 w-full animate-pulse"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <button onclick="saveExpense()" id="save-btn" class="w-full py-4 mt-2 bg-gray-900 text-white rounded-xl font-bold shadow-xl transition active:scale-95 flex justify-center items-center gap-2">حفظ العملية</button>
+                <button onclick="saveExpense()" id="save-btn" class="w-full py-4 mt-4 bg-gray-900 text-white rounded-xl font-bold shadow-xl hover:bg-gray-800 active:scale-95 transition-all flex justify-center items-center gap-2 text-lg">
+                    <span>حفظ العملية</span>
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- 4. عارض الصور والمستندات (Lightbox) -->
+    <!-- 4. عارض الصور (Lightbox) -->
     <div id="lightbox" class="fixed inset-0 bg-black/95 hidden z-[60] flex items-center justify-center backdrop-blur-sm" onclick="closeLightbox()">
-        <button class="absolute top-4 right-4 text-white bg-white/20 p-3 rounded-full z-10 hover:bg-red-500 hover:text-white transition">✕ إغلاق</button>
+        <button class="absolute top-4 right-4 text-white bg-white/10 p-3 rounded-full z-10 hover:bg-red-500 hover:text-white transition backdrop-blur-md">✕ إغلاق</button>
         <div class="lightbox-content" onclick="event.stopPropagation()">
-            <div id="lightbox-title" class="text-white text-lg font-bold mb-2 absolute top-6 left-6"></div>
-            <img id="lightbox-img" src="" class="lightbox-img hidden">
-            <iframe id="lightbox-iframe" src="" class="lightbox-iframe hidden"></iframe>
-            <div id="lightbox-message" class="hidden text-center text-white">
-                <div class="text-4xl mb-2">📄</div>
-                <p class="text-lg font-bold">تعذر عرض الملف</p>
-                <p class="text-sm text-gray-400 mb-4">يرجى تحميله لفتحه</p>
-            </div>
+            <img id="lightbox-img" src="" class="lightbox-img shadow-2xl">
         </div>
-        <a id="lightbox-download" href="#" target="_blank" class="absolute bottom-8 bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow-lg hover:bg-blue-700 transition flex items-center gap-2" onclick="event.stopPropagation()">
+        <a id="lightbox-download" href="#" download="image.jpg" class="absolute bottom-10 bg-white text-gray-900 px-6 py-3 rounded-full font-bold shadow-lg hover:bg-gray-200 transition flex items-center gap-2 z-20" onclick="event.stopPropagation()">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4 4m4-4v12" /></svg>
-            تحميل الملف
+            حفظ الصورة
         </a>
     </div>
 
     <script>
+        // إعدادات فايربيس (Firestore فقط - بدون Storage لتفادي المشاكل)
         const firebaseConfig = {
           apiKey: "AIzaSyCRbN9PDuoqZ60BAU79S-cY_ka9dtLerL4",
           authDomain: "baba-app-final.firebaseapp.com",
@@ -192,32 +191,36 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        const storage = firebase.storage();
 
         let currentProjectId = null;
         let unsubscribe = null;
         let selectedFilesRaw = [];
         let currentAttachments = [];
 
-        // 1. إدارة المشاريع
+        // ============================================
+        // 1. إدارة المشاريع (مع الحذف)
+        // ============================================
         db.collection("projects").orderBy("createdAt", "desc").onSnapshot(snapshot => {
             const list = document.getElementById('projects-list');
             list.innerHTML = "";
             if (snapshot.empty) {
-                list.innerHTML = `<div class="text-center p-8 bg-white rounded-2xl border border-dashed text-gray-400">لا توجد مشاريع</div>`;
+                list.innerHTML = `<div class="text-center p-10 bg-white rounded-3xl border-2 border-dashed border-gray-200 text-gray-400 font-medium">لا توجد مشاريع حالياً<br>ابدأ بإنشاء واحد جديد</div>`;
                 return;
             }
             snapshot.forEach(doc => {
                 const data = doc.data();
                 list.innerHTML += `
-                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between active:scale-95 transition cursor-pointer mb-3" onclick="openProject('${doc.id}', '${data.name}', ${data.totalAmount || 0})">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer mb-3 hover:shadow-md" onclick="openProject('${doc.id}', '${data.name}', ${data.totalAmount || 0})">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-xl">📂</div>
-                        <div><h3 class="font-bold text-gray-800">${data.name}</h3></div>
+                        <div class="w-14 h-14 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner">📂</div>
+                        <div>
+                            <h3 class="font-bold text-gray-800 text-lg">${data.name}</h3>
+                            <p class="text-xs text-gray-400 font-medium mt-1">اضغط للدخول</p>
+                        </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="font-bold text-gray-900">${(data.totalAmount || 0).toLocaleString()}</span>
-                        <button onclick="deleteProject(event, '${doc.id}', '${data.name}')" class="bg-red-50 text-red-500 w-10 h-10 flex items-center justify-center rounded-xl hover:bg-red-500 hover:text-white transition z-10 shadow-sm">🗑️</button>
+                        <span class="font-extrabold text-gray-900 text-lg bg-gray-50 px-3 py-1 rounded-lg">${(data.totalAmount || 0).toLocaleString()}</span>
+                        <button onclick="deleteProject(event, '${doc.id}', '${data.name}')" class="bg-red-50 text-red-500 w-10 h-10 flex items-center justify-center rounded-xl hover:bg-red-500 hover:text-white transition shadow-sm border border-red-100">🗑️</button>
                     </div>
                 </div>`;
             });
@@ -225,25 +228,28 @@
 
         async function deleteProject(e, id, name) {
             e.stopPropagation();
-            if(confirm(`هل أنت متأكد من حذف مشروع "${name}"؟`)) {
+            if(confirm(`هل أنت متأكد تماماً من حذف مشروع "${name}"؟\n\nسيتم حذف جميع البيانات والمصاريف المسجلة فيه ولا يمكن التراجع.`)) {
                 await db.collection("projects").doc(id).delete();
             }
         }
 
         function createNewProject() {
-            const name = document.getElementById('new-project-name').value;
-            if(!name) return alert("اكتب اسم المشروع");
+            const name = document.getElementById('new-project-name').value.trim();
+            if(!name) return alert("الرجاء كتابة اسم المشروع");
             db.collection("projects").add({ name: name, totalAmount: 0, createdAt: new Date() })
             .then(() => { closeModal('newProjectModal'); document.getElementById('new-project-name').value = ""; });
         }
 
-        // 2. إدارة المصاريف
+        // ============================================
+        // 2. إدارة المصاريف (عرض + تعديل + حذف + معاينة)
+        // ============================================
         function openProject(id, name, total) {
             currentProjectId = id;
             document.getElementById('projects-view').classList.add('hidden');
             document.getElementById('expenses-view').classList.remove('hidden');
             document.getElementById('current-project-name').innerText = name;
             document.getElementById('current-project-total').innerText = total.toLocaleString();
+            window.scrollTo(0,0);
 
             if(unsubscribe) unsubscribe();
             unsubscribe = db.collection("projects").doc(id).collection("expenses").orderBy("date", "desc").onSnapshot(snapshot => {
@@ -252,7 +258,7 @@
                 let totalCalc = 0;
                 
                 if(snapshot.empty) {
-                    list.innerHTML = `<div class="text-center py-10 text-gray-400">لا توجد مصاريف</div>`;
+                    list.innerHTML = `<div class="flex flex-col items-center justify-center py-20 text-gray-400 opacity-60"><div class="text-6xl mb-4">🧾</div><p class="font-bold">لا توجد مصاريف مسجلة</p></div>`;
                     document.getElementById('current-project-total').innerText = "0";
                     document.getElementById('expense-count').innerText = "0";
                     db.collection("projects").doc(id).update({ totalAmount: 0 });
@@ -271,68 +277,46 @@
                     if(data.category === 'decor') { icon = '🎨'; color = 'bg-purple-50 text-purple-600'; }
                     if(data.category === 'goods') { icon = '📦'; color = 'bg-blue-50 text-blue-600'; }
 
-                    // --- المعرض المباشر ---
-                    let galleryHTML = '';
-                    const attachments = data.attachments || [];
+                    // عرض المرفقات (صور فقط)
+                    let attachmentsHTML = '';
+                    const images = data.attachments || [];
                     
-                    if(attachments.length > 0) {
-                        galleryHTML = `<div class="gallery-grid">`;
-                        attachments.forEach(file => {
-                            let dateStr = '';
-                            const today = new Date();
-                            dateStr = today.toLocaleDateString('en-GB');
-                            
-                            let displayIcon = '📄';
-                            let label = 'مستند';
-                            
-                            if (file.type && file.type.startsWith('image/')) {
-                                displayIcon = '🖼️'; label = 'صورة';
-                            } else if (file.type && file.type.includes('pdf')) {
-                                displayIcon = '📕'; label = 'PDF';
-                            } else if (file.type && (file.type.includes('word') || file.type.includes('officedocument'))) {
-                                displayIcon = '📝'; label = 'Word';
-                            } else if (file.type && (file.type.includes('sheet') || file.type.includes('excel'))) {
-                                displayIcon = '📊'; label = 'Excel';
-                            }
-                            
-                            galleryHTML += `
-                            <div onclick="previewFile('${file.url}', '${file.name}', '${file.type}')" class="gallery-item bg-gray-50">
-                                <div class="text-2xl mb-1 text-blue-500">${displayIcon}</div>
-                                <div class="text-xs font-bold text-gray-700 truncate w-11/12 text-center">${file.name.substring(0, 8)}...</div>
-                                <div class="gallery-date">${dateStr}</div>
+                    if(images.length > 0) {
+                        attachmentsHTML = `<div class="flex gap-2 mt-3 overflow-x-auto pb-2 no-scrollbar">`;
+                        images.forEach((img, idx) => {
+                            attachmentsHTML += `
+                            <div onclick="openLightbox('${img.data}')" class="relative w-16 h-16 rounded-lg border border-gray-200 overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition">
+                                <img src="${img.data}" class="w-full h-full object-cover">
                             </div>`;
                         });
-                        galleryHTML += `</div>`;
+                        attachmentsHTML += `</div>`;
                     }
 
                     const safeName = data.name ? data.name.replace(/'/g, "\\'") : "بدون اسم";
+                    const dateStr = data.date ? new Date(data.date.toDate()).toLocaleDateString('en-GB') : '';
                     
                     list.innerHTML += `
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col mb-3 animate-fade-in">
-                        <div class="flex gap-3 w-full">
-                            <div class="${color} w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 h-fit">${icon}</div>
-                            <div class="w-full overflow-hidden">
-                                <div class="flex justify-between w-full items-start">
-                                    <div>
-                                        <h4 class="font-bold text-gray-800 text-lg">${safeName}</h4>
-                                        <div class="text-xs text-gray-400 mt-1">
-                                            ${data.date ? new Date(data.date.toDate()).toLocaleDateString('en-GB') : ''}
-                                        </div>
-                                    </div>
-                                    <span class="font-bold text-red-500 text-lg">-${amt.toLocaleString()}</span>
-                                </div>
-                                
-                                ${galleryHTML}
-
-                                <div class="flex justify-end gap-3 mt-3 border-t border-gray-50 pt-2">
-                                    <button onclick="prepareEditExpense('${expenseId}', '${safeName}', '${amt}', '${data.category}')" class="text-blue-500 bg-blue-50 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-blue-100">
-                                        ✏️ تعديل
-                                    </button>
-                                    <button onclick="deleteExpense('${expenseId}')" class="text-red-500 bg-red-50 px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-red-100">
-                                        🗑️ حذف
-                                    </button>
+                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col mb-3 animate-fade-in">
+                        <div class="flex justify-between items-start w-full mb-2">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <div class="${color} w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-sm">${icon}</div>
+                                <div class="overflow-hidden">
+                                    <h4 class="font-bold text-gray-800 text-lg truncate">${safeName}</h4>
+                                    <div class="text-xs text-gray-400 font-medium flex items-center gap-1">📅 ${dateStr}</div>
                                 </div>
                             </div>
+                            <span class="font-extrabold text-red-500 text-xl flex-shrink-0">-${amt.toLocaleString()}</span>
+                        </div>
+                        
+                        ${attachmentsHTML}
+
+                        <div class="flex justify-end gap-2 mt-3 border-t border-gray-50 pt-3">
+                            <button onclick="prepareEditExpense('${expenseId}', '${safeName}', '${amt}', '${data.category}')" class="text-blue-600 bg-blue-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-blue-100 transition">
+                                ✏️ تعديل
+                            </button>
+                            <button onclick="deleteExpense('${expenseId}')" class="text-red-600 bg-red-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-red-100 transition">
+                                🗑️ حذف
+                            </button>
                         </div>
                     </div>`;
                 });
@@ -343,24 +327,76 @@
             });
         }
 
-        // 3. التعديل والحفظ
+        // ============================================
+        // 3. منطق الصور (الضغط والتحويل) - السر الحقيقي هنا
+        // ============================================
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // نحدد أقصى أبعاد للصورة (800px كافية جداً للموبايل)
+                        const MAX_WIDTH = 800;
+                        const MAX_HEIGHT = 800;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        } else {
+                            if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // ضغط الجودة إلى 60% (يقلل الحجم بشكل هائل مع الحفاظ على الوضوح)
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                        resolve(dataUrl);
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+            });
+        }
+
+        function handleFileSelect(input) {
+            const files = input.files;
+            const list = document.getElementById('selected-files-list');
+            
+            if (files.length > 0) {
+                document.getElementById('upload-placeholder').classList.add('hidden');
+                list.classList.remove('hidden');
+            }
+            
+            for(let i=0; i<files.length; i++) {
+                selectedFilesRaw.push(files[i]);
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-blue-50 p-3 rounded-xl text-sm border border-blue-100 animate-fade-in';
+                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">🖼️ ${files[i].name}</span><span class="text-xs text-gray-400">جاهز</span>`;
+                list.appendChild(div);
+            }
+        }
+
+        // ============================================
+        // 4. الحفظ والتعديل
+        // ============================================
         function prepareAddExpense() {
+            resetModal();
             document.getElementById('modal-title').innerText = "إضافة مصروف";
-            document.getElementById('editing-expense-id').value = "";
-            document.getElementById('exp-amount').value = "";
-            document.getElementById('exp-name').value = "";
-            document.getElementById('exp-files').value = "";
-            document.getElementById('current-attachments-area').classList.add('hidden');
             document.getElementById('save-btn').innerText = "حفظ العملية";
-            selectedFilesRaw = [];
-            document.getElementById('selected-files-list').innerHTML = "";
-            document.getElementById('selected-files-list').classList.add('hidden');
-            document.getElementById('upload-placeholder').style.display = 'block';
-            selectCategory(document.querySelector('.cat-btn'), 'other');
             openModal('addExpenseModal');
         }
 
         async function prepareEditExpense(id, name, amount, category) {
+            resetModal();
             document.getElementById('modal-title').innerText = "تعديل المصروف";
             document.getElementById('editing-expense-id').value = id;
             document.getElementById('exp-amount').value = amount;
@@ -368,43 +404,38 @@
             document.getElementById('exp-cat').value = category;
             document.getElementById('save-btn').innerText = "حفظ التعديلات";
 
-            const buttons = document.querySelectorAll('.cat-btn');
-            buttons.forEach(btn => {
+            // تحديد التصنيف
+            document.querySelectorAll('.cat-btn').forEach(btn => {
                 if(btn.innerText.includes(category === 'equipment' ? 'معدات' : category === 'goods' ? 'بضاعة' : category === 'decor' ? 'ديكور' : 'حكومي')) {
                     selectCategory(btn, category);
                 }
             });
 
+            // جلب المرفقات الحالية
             const doc = await db.collection("projects").doc(currentProjectId).collection("expenses").doc(id).get();
-            const data = doc.data();
-            currentAttachments = data.attachments || [];
-            
-            const listDiv = document.getElementById('current-attachments-list');
-            listDiv.innerHTML = "";
+            currentAttachments = doc.data().attachments || [];
             
             if(currentAttachments.length > 0) {
+                const listDiv = document.getElementById('current-attachments-list');
                 document.getElementById('current-attachments-area').classList.remove('hidden');
-                currentAttachments.forEach((file, idx) => {
+                listDiv.innerHTML = "";
+                currentAttachments.forEach((img, idx) => {
                     listDiv.innerHTML += `
-                    <div class="flex justify-between items-center bg-blue-50 p-2 rounded text-sm" id="curr-file-${idx}">
-                        <span class="truncate w-48 text-blue-800">📎 ${file.name}</span>
-                        <button onclick="markAttachmentForDeletion('${id}', ${idx})" class="text-red-500 text-xs font-bold px-2 border border-red-200 rounded bg-white">حذف</button>
+                    <div class="flex justify-between items-center bg-white border border-gray-200 p-2 rounded-xl text-sm" id="curr-file-${idx}">
+                        <img src="${img.data}" class="w-8 h-8 rounded object-cover border border-gray-100">
+                        <span class="text-xs text-gray-500 font-mono ml-2">صورة محفوظة</span>
+                        <button onclick="markDeleted(${idx})" class="text-red-500 text-xs font-bold px-3 py-1 bg-red-50 rounded-lg hover:bg-red-100">حذف</button>
                     </div>`;
                 });
-            } else {
-                document.getElementById('current-attachments-area').classList.add('hidden');
             }
-
-            selectedFilesRaw = [];
-            document.getElementById('selected-files-list').innerHTML = "";
-            document.getElementById('upload-placeholder').style.display = 'block';
+            
             openModal('addExpenseModal');
         }
 
-        function markAttachmentForDeletion(expenseId, index) {
+        function markDeleted(index) {
             const item = document.getElementById(`curr-file-${index}`);
-            item.style.textDecoration = "line-through";
-            item.style.opacity = "0.5";
+            item.style.opacity = "0.4";
+            item.style.pointerEvents = "none";
             currentAttachments[index].deleted = true;
         }
 
@@ -417,138 +448,101 @@
 
             if(!amt || !name) return alert("الرجاء تعبئة البيانات");
             
-            btn.innerText = "جاري المعالجة...";
+            btn.innerText = "جاري المعالجة والضغط...";
             btn.disabled = true;
             document.getElementById('status-bar').classList.remove('hidden');
             
             try {
-                let expenseRef;
-                let finalAttachments = [];
+                let newAttachments = [];
 
-                if (editId) {
-                    expenseRef = db.collection("projects").doc(currentProjectId).collection("expenses").doc(editId);
-                    finalAttachments = currentAttachments.filter(f => !f.deleted);
-                } else {
-                    expenseRef = await db.collection("projects").doc(currentProjectId).collection("expenses").add({
-                        amount: Number(amt),
-                        name: name,
-                        category: cat,
-                        date: new Date(),
-                        attachments: []
-                    });
-                }
-
-                // رفع الملفات الجديدة (مع شريط تقدم حقيقي)
-                if(selectedFilesRaw.length > 0) {
+                // 1. ضغط الصور الجديدة
+                if (selectedFilesRaw.length > 0) {
                     for(let i=0; i < selectedFilesRaw.length; i++) {
-                        const file = selectedFilesRaw[i];
-                        const storageRef = storage.ref(`projects/${currentProjectId}/${Date.now()}_${file.name}`);
-                        const uploadTask = storageRef.put(file);
-
-                        // انتظار اكتمال الرفع مع مراقبة التقدم
-                        await new Promise((resolve, reject) => {
-                            uploadTask.on('state_changed', 
-                                (snapshot) => {
-                                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                                    // حساب النسبة الكلية بناءً على عدد الملفات
-                                    const totalPercent = ((i * 100) + progress) / selectedFilesRaw.length;
-                                    updateProgress(totalPercent, `جاري رفع: ${file.name}`);
-                                }, 
-                                (error) => { reject(error); }, 
-                                async () => {
-                                    const downloadURL = await uploadTask.snapshot.ref.getDownloadURL();
-                                    finalAttachments.push({
-                                        name: file.name,
-                                        url: downloadURL,
-                                        type: file.type,
-                                        date: new Date().toISOString()
-                                    });
-                                    resolve();
-                                }
-                            );
-                        });
+                        updateProgress(((i+1)/selectedFilesRaw.length)*50, `جاري ضغط الصورة ${i+1}...`);
+                        const base64 = await compressImage(selectedFilesRaw[i]);
+                        newAttachments.push({ data: base64 });
                     }
                 }
 
-                await expenseRef.update({
+                // 2. دمج مع القديم (في حال التعديل)
+                let finalAttachments = [];
+                if (editId) {
+                    finalAttachments = currentAttachments.filter(f => !f.deleted).concat(newAttachments);
+                } else {
+                    finalAttachments = newAttachments;
+                }
+
+                updateProgress(80, "جاري الحفظ في قاعدة البيانات...");
+
+                const expenseData = {
                     amount: Number(amt),
                     name: name,
                     category: cat,
                     attachments: finalAttachments
-                });
+                };
 
-                updateProgress(100, "تم الحفظ!");
+                if (editId) {
+                    await db.collection("projects").doc(currentProjectId).collection("expenses").doc(editId).update(expenseData);
+                } else {
+                    expenseData.date = new Date();
+                    await db.collection("projects").doc(currentProjectId).collection("expenses").add(expenseData);
+                }
+
+                updateProgress(100, "تم بنجاح!");
                 setTimeout(() => {
                     closeModal('addExpenseModal');
-                    document.getElementById('status-bar').classList.add('hidden');
-                    btn.disabled = false;
+                    resetModal();
                 }, 500);
 
             } catch(e) {
                 alert("حدث خطأ: " + e.message);
+                console.error(e);
                 btn.disabled = false;
+                btn.innerText = "حاول مرة أخرى";
             }
         }
 
-        // 4. المعاينة (Lightbox)
-        function previewFile(url, name, type) {
-            const lightbox = document.getElementById('lightbox');
-            const img = document.getElementById('lightbox-img');
-            const iframe = document.getElementById('lightbox-iframe');
-            const msg = document.getElementById('lightbox-message');
-            const title = document.getElementById('lightbox-title');
-            const downloadBtn = document.getElementById('lightbox-download');
-            
-            lightbox.classList.remove('hidden');
-            img.classList.add('hidden');
-            iframe.classList.add('hidden');
-            msg.classList.add('hidden');
-            title.innerText = name;
-            downloadBtn.href = url;
-
-            if (type && type.startsWith('image/')) {
-                img.src = url;
-                img.classList.remove('hidden');
-            } else {
-                // استخدام Google Docs Viewer للمستندات
-                const encodedUrl = encodeURIComponent(url);
-                const viewerUrl = `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
-                iframe.src = viewerUrl;
-                iframe.classList.remove('hidden');
-            }
-        }
-
-        function closeLightbox() {
-            document.getElementById('lightbox').classList.add('hidden');
-            document.getElementById('lightbox-img').src = "";
-            document.getElementById('lightbox-iframe').src = "";
-        }
-
-        function handleFileSelect(input) {
-            const files = input.files;
-            const list = document.getElementById('selected-files-list');
-            document.getElementById('upload-placeholder').style.display = 'none';
-            list.classList.remove('hidden');
-            
-            for(let i=0; i<files.length; i++) {
-                selectedFilesRaw.push(files[i]);
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center bg-green-50 p-2 rounded text-sm';
-                div.innerHTML = `<span class="truncate w-48 text-green-700">➕ ${files[i].name}</span>`;
-                list.appendChild(div);
-            }
+        // ============================================
+        // 5. دوال مساعدة وواجهة
+        // ============================================
+        function resetModal() {
+            document.getElementById('editing-expense-id').value = "";
+            document.getElementById('exp-amount').value = "";
+            document.getElementById('exp-name').value = "";
+            document.getElementById('exp-files').value = "";
+            document.getElementById('current-attachments-area').classList.add('hidden');
+            document.getElementById('selected-files-list').innerHTML = "";
+            document.getElementById('selected-files-list').classList.add('hidden');
+            document.getElementById('upload-placeholder').classList.remove('hidden');
+            document.getElementById('status-bar').classList.add('hidden');
+            document.getElementById('save-btn').disabled = false;
+            selectedFilesRaw = [];
+            currentAttachments = [];
+            selectCategory(document.querySelector('.cat-btn'), 'other');
         }
 
         function updateProgress(percent, text) {
             document.getElementById('progress-bar').style.width = `${percent}%`;
             document.getElementById('status-text').innerText = text;
-            document.getElementById('upload-percentage').innerText = `${Math.round(percent)}%`;
         }
 
         function deleteExpense(id) {
-            if(confirm("هل أنت متأكد من حذف هذا المصروف؟")) {
+            if(confirm("حذف هذا المصروف؟")) {
                 db.collection("projects").doc(currentProjectId).collection("expenses").doc(id).delete();
             }
+        }
+
+        function openLightbox(src) {
+            const lb = document.getElementById('lightbox');
+            const img = document.getElementById('lightbox-img');
+            const dl = document.getElementById('lightbox-download');
+            lb.classList.remove('hidden');
+            img.src = src;
+            dl.href = src;
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.add('hidden');
         }
 
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }

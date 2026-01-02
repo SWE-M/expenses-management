@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ادارة المصاريف </title>
+    <title>ادارة المصاريف</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <!-- مكتبات فايربيس -->
+    <!-- مكتبات فايربيس (إضافة Auth) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script> 
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
     <!-- مكتبة PDF.js لعرض الملفات على الجوال -->
@@ -38,8 +39,14 @@
 </head>
 <body class="bg-gray-50 text-gray-800 pb-24 select-none">
 
+    <!-- شاشة تحميل للمصادقة -->
+    <div id="auth-loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+        <div class="loader mb-4" style="width: 40px; height: 40px; border-width: 4px;"></div>
+        <p class="text-gray-500 font-bold">جاري الاتصال بقاعدة البيانات...</p>
+    </div>
+
     <!-- 1. الشاشة الرئيسية -->
-    <div id="projects-view" class="p-6 max-w-md mx-auto min-h-screen fade-in">
+    <div id="projects-view" class="p-6 max-w-md mx-auto min-h-screen fade-in hidden">
         <div class="flex justify-between items-center mb-8 mt-4">
             <div>
                 <h1 class="text-3xl font-extrabold text-gray-900">مشاريعي</h1>
@@ -202,7 +209,23 @@
         };
 
         firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
         const db = firebase.firestore();
+
+        // تفعيل المصادقة المجهولة تلقائياً لحل مشاكل التصاريح
+        auth.signInAnonymously()
+            .then(() => {
+                console.log("Logged in anonymously");
+                // إظهار المحتوى وإخفاء اللودر
+                document.getElementById('auth-loading').classList.add('hidden');
+                document.getElementById('projects-view').classList.remove('hidden');
+                // بدء مراقبة البيانات بعد التأكد من تسجيل الدخول
+                startApp();
+            })
+            .catch((error) => {
+                console.error("Login failed", error);
+                alert("فشل الاتصال بقاعدة البيانات. الرجاء التحقق من الإنترنت.");
+            });
 
         let currentProjectId = null;
         let unsubscribe = null;
@@ -210,32 +233,38 @@
         let currentAttachments = [];
         const CHUNK_SIZE = 800 * 1024; 
 
-        // 1. إدارة المشاريع
-        db.collection("projects").orderBy("createdAt", "desc").onSnapshot(snapshot => {
-            const list = document.getElementById('projects-list');
-            list.innerHTML = "";
-            if (snapshot.empty) {
-                list.innerHTML = `<div class="text-center p-10 bg-white rounded-3xl border-2 border-dashed border-gray-200 text-gray-400 font-medium">لا توجد مشاريع حالياً<br>ابدأ بإنشاء واحد جديد</div>`;
-                return;
-            }
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                list.innerHTML += `
-                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer mb-3 hover:shadow-md" onclick="openProject('${doc.id}', '${data.name}', ${data.totalAmount || 0})">
-                    <div class="flex items-center gap-4">
-                        <div class="w-14 h-14 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner">📂</div>
-                        <div>
-                            <h3 class="font-bold text-gray-800 text-lg">${data.name}</h3>
-                            <p class="text-xs text-gray-400 font-medium mt-1">اضغط للدخول</p>
+        function startApp() {
+            // 1. إدارة المشاريع
+            db.collection("projects").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+                const list = document.getElementById('projects-list');
+                list.innerHTML = "";
+                if (snapshot.empty) {
+                    list.innerHTML = `<div class="text-center p-10 bg-white rounded-3xl border-2 border-dashed border-gray-200 text-gray-400 font-medium">لا توجد مشاريع حالياً<br>ابدأ بإنشاء واحد جديد</div>`;
+                    return;
+                }
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    list.innerHTML += `
+                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer mb-3 hover:shadow-md" onclick="openProject('${doc.id}', '${data.name}', ${data.totalAmount || 0})">
+                        <div class="flex items-center gap-4">
+                            <div class="w-14 h-14 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner">📂</div>
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-lg">${data.name}</h3>
+                                <p class="text-xs text-gray-400 font-medium mt-1">اضغط للدخول</p>
+                            </div>
                         </div>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="font-extrabold text-gray-900 text-lg bg-gray-50 px-3 py-1 rounded-lg">${(data.totalAmount || 0).toLocaleString()}</span>
-                        <button onclick="deleteProject(event, '${doc.id}', '${data.name}')" class="bg-red-50 text-red-500 w-10 h-10 flex items-center justify-center rounded-xl hover:bg-red-500 hover:text-white transition shadow-sm border border-red-100">🗑️</button>
-                    </div>
-                </div>`;
+                        <div class="flex items-center gap-3">
+                            <span class="font-extrabold text-gray-900 text-lg bg-gray-50 px-3 py-1 rounded-lg">${(data.totalAmount || 0).toLocaleString()}</span>
+                            <button onclick="deleteProject(event, '${doc.id}', '${data.name}')" class="bg-red-50 text-red-500 w-10 h-10 flex items-center justify-center rounded-xl hover:bg-red-500 hover:text-white transition shadow-sm border border-red-100">🗑️</button>
+                        </div>
+                    </div>`;
+                });
+            }, error => {
+                if (error.code === 'permission-denied') {
+                    console.error("Permission denied. Waiting for auth...");
+                }
             });
-        });
+        }
 
         async function deleteProject(e, id, name) {
             e.stopPropagation();
@@ -289,14 +318,30 @@
                     const safeName = data.name ? data.name.replace(/'/g, "\\'") : "بدون اسم";
                     const dateStr = data.date ? new Date(data.date.toDate()).toLocaleDateString('en-GB') : '';
                     
-                    // جزء المرفقات (المخفي افتراضياً)
+                    // جزء المرفقات
                     const filesSummary = data.filesSummary || [];
                     let detailsHTML = '';
                     
                     if(filesSummary.length > 0) {
                         detailsHTML = `<div id="attachments-${expenseId}" class="expense-details">
-                            <div class="text-center text-gray-400 text-sm py-2">جاري تحميل المرفقات...</div>
-                        </div>`;
+                            <div class="grid grid-cols-2 gap-2 mt-2 border-t pt-2">`;
+                        
+                        filesSummary.forEach(file => {
+                            let typeIcon = '📄';
+                            if(file.type.includes('image')) typeIcon = '🖼️';
+                            else if(file.type.includes('pdf')) typeIcon = '📕';
+                            else if(file.type.includes('sheet') || file.type.includes('excel')) typeIcon = '📊';
+                            
+                            detailsHTML += `
+                            <div onclick="event.stopPropagation(); previewFile('${expenseId}', '${file.id}', '${file.name}', ${file.isChunked}, '${file.type}')" class="bg-gray-50 border rounded-lg p-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition">
+                                <span class="text-xl">${typeIcon}</span>
+                                <div class="overflow-hidden">
+                                    <p class="text-xs font-bold text-gray-700 truncate w-24">${file.name}</p>
+                                    <p class="text-[10px] text-blue-500 font-bold">اضغط للمعاينة</p>
+                                </div>
+                            </div>`;
+                        });
+                        detailsHTML += `</div></div>`;
                     } else {
                         detailsHTML = `<div id="attachments-${expenseId}" class="expense-details"><div class="text-center text-gray-400 text-sm py-2">لا توجد مرفقات</div></div>`;
                     }
@@ -343,64 +388,25 @@
             if (detailsDiv.classList.contains('open')) {
                 detailsDiv.classList.remove('open');
                 controlsDiv.classList.remove('open');
-                return;
-            }
-
-            document.querySelectorAll('.expense-details.open').forEach(el => el.classList.remove('open'));
-
-            detailsDiv.classList.add('open');
-            controlsDiv.classList.add('open');
-
-            // تحميل المرفقات
-            try {
-                const doc = await db.collection("projects").doc(currentProjectId).collection("expenses").doc(expenseId).get();
-                const data = doc.data();
-                const filesSummary = data.filesSummary || [];
-
-                if (filesSummary.length === 0) {
-                    detailsDiv.innerHTML = `<div class="text-center text-gray-400 text-sm py-2 border-t border-dashed mt-2">لا توجد مرفقات</div>`;
-                } else {
-                    detailsDiv.innerHTML = `<div class="grid grid-cols-2 gap-2 mt-2 border-t pt-2" id="grid-${expenseId}"></div>`;
-                    const grid = document.getElementById(`grid-${expenseId}`);
-                    
-                    for (const file of filesSummary) {
-                        // زر المعاينة
-                        const btn = document.createElement('div');
-                        btn.className = "bg-gray-50 border rounded-lg p-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition";
-                        btn.onclick = (e) => { e.stopPropagation(); loadAndShowFile(expenseId, file.id, file.name, file.isChunked, file.type); };
-                        
-                        let icon = '📄';
-                        if(file.type.includes('image')) icon = '🖼️';
-                        else if(file.type.includes('pdf')) icon = '📕';
-                        else if(file.type.includes('sheet') || file.type.includes('excel')) icon = '📊';
-
-                        btn.innerHTML = `
-                            <span class="text-xl">${icon}</span>
-                            <div class="overflow-hidden">
-                                <p class="text-xs font-bold text-gray-700 truncate w-24">${file.name}</p>
-                                <p class="text-[10px] text-gray-400">اضغط للمعاينة</p>
-                            </div>
-                        `;
-                        grid.appendChild(btn);
-                    }
-                }
-            } catch (e) {
-                detailsDiv.innerHTML = `<div class="text-red-500 text-xs text-center">فشل التحميل</div>`;
+            } else {
+                document.querySelectorAll('.expense-details.open').forEach(el => el.classList.remove('open'));
+                detailsDiv.classList.add('open');
+                controlsDiv.classList.add('open');
             }
         }
 
-        async function loadAndShowFile(expenseId, fileId, fileName, isChunked, fileType) {
+        async function previewFile(expenseId, fileId, fileName, isChunked, fileType) {
             const modal = document.getElementById('fileViewerModal');
             const content = document.getElementById('viewer-content');
             const title = document.getElementById('viewer-filename');
             const dlBtn = document.getElementById('viewer-download-btn');
             
             title.innerText = fileName;
-            content.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader mb-4"></div><span class="text-white text-sm">جاري معالجة الملف...</span></div>`;
+            content.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader mb-4"></div><span class="text-white text-sm">جاري جلب الملف وتجميعه...</span></div>`;
             modal.classList.remove('hidden');
 
             try {
-                // جلب البيانات
+                // جلب البيانات (تجميع القطع إذا لزم الأمر)
                 const base64Data = await getFileData(expenseId, fileId, isChunked);
                 
                 // إعداد زر التحميل
@@ -408,31 +414,28 @@
                 dlBtn.download = fileName;
 
                 // عرض المحتوى حسب النوع
-                content.innerHTML = ''; // مسح اللودر
+                content.innerHTML = '';
                 
                 if (fileType.startsWith('image/')) {
-                    // عرض صورة
                     content.innerHTML = `<img src="${base64Data}" class="viewer-img shadow-2xl rounded-lg max-h-full max-w-full object-contain">`;
                 } else if (fileType === 'application/pdf') {
-                    // عرض PDF باستخدام مكتبة PDF.js
+                    // عرض PDF باستخدام PDF.js
                     const loadingTask = pdfjsLib.getDocument(base64Data);
                     const pdf = await loadingTask.promise;
                     
-                    // إنشاء حاوية للتمرير
                     const scrollContainer = document.createElement('div');
-                    scrollContainer.className = "w-full h-full overflow-y-auto p-4 flex flex-col items-center gap-4";
+                    scrollContainer.className = "w-full h-full overflow-y-auto p-4 flex flex-col items-center gap-4 bg-gray-800";
                     scrollContainer.id = "pdf-scroll-container";
                     
-                    // رندر جميع الصفحات
                     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                         const page = await pdf.getPage(pageNum);
-                        const viewport = page.getViewport({scale: 1.5}); // تكبير للجودة
+                        const viewport = page.getViewport({scale: 1.2});
                         
                         const canvas = document.createElement('canvas');
                         const context = canvas.getContext('2d');
                         canvas.height = viewport.height;
                         canvas.width = viewport.width;
-                        canvas.className = "shadow-lg rounded-sm max-w-full h-auto"; // تنسيق الكانفاس
+                        canvas.className = "shadow-lg rounded max-w-full h-auto bg-white";
 
                         const renderContext = {
                             canvasContext: context,
@@ -480,8 +483,10 @@
             }
         }
 
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
         // ============================================
-        // 4. الحفظ والتقطيع (Core)
+        // 4. الرفع الحقيقي (Real Upload)
         // ============================================
         function readFileAsBase64(file) {
             return new Promise((resolve, reject) => {
@@ -501,7 +506,7 @@
 
             if(!amt || !name) return alert("الرجاء تعبئة البيانات");
             
-            btn.innerText = "جاري المعالجة...";
+            btn.innerText = "جاري التحضير...";
             btn.disabled = true;
             document.getElementById('status-bar').classList.remove('hidden');
             
@@ -522,39 +527,40 @@
                     });
                 }
 
-                for(let i=0; i < selectedFilesRaw.length; i++) {
-                    const file = selectedFilesRaw[i];
-                    const progress = ((i / selectedFilesRaw.length) * 100);
-                    updateProgress(progress, `جاري رفع: ${file.name}`);
+                if (selectedFilesRaw.length > 0) {
+                    for(let i=0; i < selectedFilesRaw.length; i++) {
+                        const file = selectedFilesRaw[i];
+                        const progress = ((i / selectedFilesRaw.length) * 100);
+                        updateProgress(progress, `جاري رفع: ${file.name}`);
 
-                    const base64 = await readFileAsBase64(file);
-                    const isLarge = base64.length > CHUNK_SIZE;
-                    
-                    const fileDocRef = expenseRef.collection('files').doc();
+                        const base64 = await readFileAsBase64(file);
+                        const isLarge = base64.length > CHUNK_SIZE;
+                        const fileDocRef = expenseRef.collection('files').doc();
 
-                    if(!isLarge) {
-                        await fileDocRef.set({ name: file.name, type: file.type, data: base64, isChunked: false });
-                    } else {
-                        await fileDocRef.set({ name: file.name, type: file.type, isChunked: true, totalSize: base64.length });
-                        const chunks = [];
-                        for (let k = 0; k < base64.length; k += CHUNK_SIZE) {
-                            chunks.push(base64.substring(k, k + CHUNK_SIZE));
+                        if(!isLarge) {
+                            await fileDocRef.set({ name: file.name, type: file.type, data: base64, isChunked: false });
+                        } else {
+                            await fileDocRef.set({ name: file.name, type: file.type, isChunked: true, totalSize: base64.length });
+                            const chunks = [];
+                            for (let k = 0; k < base64.length; k += CHUNK_SIZE) {
+                                chunks.push(base64.substring(k, k + CHUNK_SIZE));
+                            }
+                            const batch = db.batch();
+                            chunks.forEach((chunk, idx) => {
+                                const chunkRef = fileDocRef.collection('chunks').doc(idx.toString().padStart(4, '0'));
+                                batch.set(chunkRef, { data: chunk, index: idx });
+                            });
+                            await batch.commit();
                         }
-                        const batch = db.batch();
-                        chunks.forEach((chunk, idx) => {
-                            const chunkRef = fileDocRef.collection('chunks').doc(idx.toString().padStart(4, '0'));
-                            batch.set(chunkRef, { data: chunk, index: idx });
-                        });
-                        await batch.commit();
-                    }
 
-                    filesSummary.push({
-                        id: fileDocRef.id,
-                        name: file.name,
-                        type: file.type,
-                        isChunked: isLarge,
-                        uploadDate: new Date().toISOString()
-                    });
+                        filesSummary.push({
+                            id: fileDocRef.id,
+                            name: file.name,
+                            type: file.type,
+                            isChunked: isLarge,
+                            uploadDate: new Date().toISOString()
+                        });
+                    }
                 }
 
                 await expenseRef.update({
@@ -564,7 +570,7 @@
                     filesSummary: filesSummary
                 });
 
-                updateProgress(100, "تم الحفظ!");
+                updateProgress(100, "تم الحفظ بنجاح!");
                 setTimeout(() => {
                     closeModal('addExpenseModal');
                     resetModal();
@@ -578,6 +584,9 @@
             }
         }
 
+        // ============================================
+        // 5. دوال مساعدة
+        // ============================================
         function handleFileSelect(input) {
             const files = input.files;
             const list = document.getElementById('selected-files-list');
@@ -590,14 +599,16 @@
             for(let i=0; i<files.length; i++) {
                 selectedFilesRaw.push(files[i]);
                 const div = document.createElement('div');
-                let icon = '📄';
-                if(files[i].type.includes('image')) icon = '🖼️';
-                if(files[i].type.includes('pdf')) icon = '📕';
-                
                 div.className = 'flex justify-between items-center bg-blue-50 p-3 rounded-xl text-sm border border-blue-100 animate-fade-in';
-                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">${icon} ${files[i].name}</span><span class="text-xs text-gray-400">جاهز</span>`;
+                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">📄 ${files[i].name}</span><span class="text-xs text-gray-400">جاهز للرفع</span>`;
                 list.appendChild(div);
             }
+        }
+
+        function updateProgress(percent, text) {
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('status-text').innerText = text;
+            document.getElementById('status-percent').innerText = `${Math.round(percent)}%`;
         }
 
         function prepareAddExpense() {
@@ -638,7 +649,6 @@
                     </div>`;
                 });
             }
-            
             openModal('addExpenseModal');
         }
 
@@ -660,14 +670,10 @@
             document.getElementById('upload-placeholder').classList.remove('hidden');
             document.getElementById('status-bar').classList.add('hidden');
             document.getElementById('save-btn').disabled = false;
+            document.getElementById('save-btn').innerText = "حفظ العملية";
             selectedFilesRaw = [];
             currentAttachments = [];
             selectCategory(document.querySelector('.cat-btn'), 'other');
-        }
-
-        function updateProgress(percent, text) {
-            document.getElementById('progress-bar').style.width = `${percent}%`;
-            document.getElementById('status-text').innerText = text;
         }
 
         function deleteExpense(id) {
@@ -690,4 +696,3 @@
     </script>
 </body>
 </html>
-

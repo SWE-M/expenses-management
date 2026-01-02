@@ -7,9 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <!-- مكتبات فايربيس (إضافة Auth) -->
+    <!-- مكتبات فايربيس (تم إضافة Auth للإصلاح) -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script> 
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
     <!-- مكتبة PDF.js لعرض الملفات على الجوال -->
@@ -212,19 +212,17 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // تفعيل المصادقة المجهولة تلقائياً لحل مشاكل التصاريح
+        // المصادقة المجهولة لإصلاح مشاكل التصاريح
         auth.signInAnonymously()
             .then(() => {
-                console.log("Logged in anonymously");
-                // إظهار المحتوى وإخفاء اللودر
+                // إظهار المحتوى عند نجاح الاتصال
                 document.getElementById('auth-loading').classList.add('hidden');
                 document.getElementById('projects-view').classList.remove('hidden');
-                // بدء مراقبة البيانات بعد التأكد من تسجيل الدخول
                 startApp();
             })
             .catch((error) => {
                 console.error("Login failed", error);
-                alert("فشل الاتصال بقاعدة البيانات. الرجاء التحقق من الإنترنت.");
+                alert("تعذر الاتصال بقاعدة البيانات.");
             });
 
         let currentProjectId = null;
@@ -261,7 +259,7 @@
                 });
             }, error => {
                 if (error.code === 'permission-denied') {
-                    console.error("Permission denied. Waiting for auth...");
+                    console.error("جاري انتظار المصادقة...");
                 }
             });
         }
@@ -388,14 +386,53 @@
             if (detailsDiv.classList.contains('open')) {
                 detailsDiv.classList.remove('open');
                 controlsDiv.classList.remove('open');
-            } else {
-                document.querySelectorAll('.expense-details.open').forEach(el => el.classList.remove('open'));
-                detailsDiv.classList.add('open');
-                controlsDiv.classList.add('open');
+                return;
+            }
+
+            document.querySelectorAll('.expense-details.open').forEach(el => el.classList.remove('open'));
+
+            detailsDiv.classList.add('open');
+            controlsDiv.classList.add('open');
+
+            // تحميل المرفقات
+            try {
+                const doc = await db.collection("projects").doc(currentProjectId).collection("expenses").doc(expenseId).get();
+                const data = doc.data();
+                const filesSummary = data.filesSummary || [];
+
+                if (filesSummary.length === 0) {
+                    detailsDiv.innerHTML = `<div class="text-center text-gray-400 text-sm py-2 border-t border-dashed mt-2">لا توجد مرفقات</div>`;
+                } else {
+                    detailsDiv.innerHTML = `<div class="grid grid-cols-2 gap-2 mt-2 border-t pt-2" id="grid-${expenseId}"></div>`;
+                    const grid = document.getElementById(`grid-${expenseId}`);
+                    
+                    for (const file of filesSummary) {
+                        // زر المعاينة
+                        const btn = document.createElement('div');
+                        btn.className = "bg-gray-50 border rounded-lg p-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition";
+                        btn.onclick = (e) => { e.stopPropagation(); loadAndShowFile(expenseId, file.id, file.name, file.isChunked, file.type); };
+                        
+                        let icon = '📄';
+                        if(file.type.includes('image')) icon = '🖼️';
+                        else if(file.type.includes('pdf')) icon = '📕';
+                        else if(file.type.includes('sheet') || file.type.includes('excel')) icon = '📊';
+
+                        btn.innerHTML = `
+                            <span class="text-xl">${icon}</span>
+                            <div class="overflow-hidden">
+                                <p class="text-xs font-bold text-gray-700 truncate w-24">${file.name}</p>
+                                <p class="text-[10px] text-blue-500 font-bold">اضغط للمعاينة</p>
+                            </div>
+                        `;
+                        grid.appendChild(btn);
+                    }
+                }
+            } catch (e) {
+                detailsDiv.innerHTML = `<div class="text-red-500 text-xs text-center">فشل التحميل</div>`;
             }
         }
 
-        async function previewFile(expenseId, fileId, fileName, isChunked, fileType) {
+        async function loadAndShowFile(expenseId, fileId, fileName, isChunked, fileType) {
             const modal = document.getElementById('fileViewerModal');
             const content = document.getElementById('viewer-content');
             const title = document.getElementById('viewer-filename');
@@ -406,7 +443,7 @@
             modal.classList.remove('hidden');
 
             try {
-                // جلب البيانات (تجميع القطع إذا لزم الأمر)
+                // جلب البيانات
                 const base64Data = await getFileData(expenseId, fileId, isChunked);
                 
                 // إعداد زر التحميل
@@ -414,28 +451,31 @@
                 dlBtn.download = fileName;
 
                 // عرض المحتوى حسب النوع
-                content.innerHTML = '';
+                content.innerHTML = ''; // مسح اللودر
                 
                 if (fileType.startsWith('image/')) {
+                    // عرض صورة
                     content.innerHTML = `<img src="${base64Data}" class="viewer-img shadow-2xl rounded-lg max-h-full max-w-full object-contain">`;
                 } else if (fileType === 'application/pdf') {
-                    // عرض PDF باستخدام PDF.js
+                    // عرض PDF باستخدام مكتبة PDF.js
                     const loadingTask = pdfjsLib.getDocument(base64Data);
                     const pdf = await loadingTask.promise;
                     
+                    // إنشاء حاوية للتمرير
                     const scrollContainer = document.createElement('div');
                     scrollContainer.className = "w-full h-full overflow-y-auto p-4 flex flex-col items-center gap-4 bg-gray-800";
                     scrollContainer.id = "pdf-scroll-container";
                     
+                    // رندر جميع الصفحات
                     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
                         const page = await pdf.getPage(pageNum);
-                        const viewport = page.getViewport({scale: 1.2});
+                        const viewport = page.getViewport({scale: 1.5}); // تكبير للجودة
                         
                         const canvas = document.createElement('canvas');
                         const context = canvas.getContext('2d');
                         canvas.height = viewport.height;
                         canvas.width = viewport.width;
-                        canvas.className = "shadow-lg rounded max-w-full h-auto bg-white";
+                        canvas.className = "shadow-lg rounded-sm max-w-full h-auto"; // تنسيق الكانفاس
 
                         const renderContext = {
                             canvasContext: context,
@@ -483,10 +523,8 @@
             }
         }
 
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
         // ============================================
-        // 4. الرفع الحقيقي (Real Upload)
+        // 4. الحفظ والتقطيع (Core)
         // ============================================
         function readFileAsBase64(file) {
             return new Promise((resolve, reject) => {
@@ -506,7 +544,7 @@
 
             if(!amt || !name) return alert("الرجاء تعبئة البيانات");
             
-            btn.innerText = "جاري التحضير...";
+            btn.innerText = "جاري المعالجة...";
             btn.disabled = true;
             document.getElementById('status-bar').classList.remove('hidden');
             
@@ -527,40 +565,39 @@
                     });
                 }
 
-                if (selectedFilesRaw.length > 0) {
-                    for(let i=0; i < selectedFilesRaw.length; i++) {
-                        const file = selectedFilesRaw[i];
-                        const progress = ((i / selectedFilesRaw.length) * 100);
-                        updateProgress(progress, `جاري رفع: ${file.name}`);
+                for(let i=0; i < selectedFilesRaw.length; i++) {
+                    const file = selectedFilesRaw[i];
+                    const progress = ((i / selectedFilesRaw.length) * 100);
+                    updateProgress(progress, `جاري رفع: ${file.name}`);
 
-                        const base64 = await readFileAsBase64(file);
-                        const isLarge = base64.length > CHUNK_SIZE;
-                        const fileDocRef = expenseRef.collection('files').doc();
+                    const base64 = await readFileAsBase64(file);
+                    const isLarge = base64.length > CHUNK_SIZE;
+                    
+                    const fileDocRef = expenseRef.collection('files').doc();
 
-                        if(!isLarge) {
-                            await fileDocRef.set({ name: file.name, type: file.type, data: base64, isChunked: false });
-                        } else {
-                            await fileDocRef.set({ name: file.name, type: file.type, isChunked: true, totalSize: base64.length });
-                            const chunks = [];
-                            for (let k = 0; k < base64.length; k += CHUNK_SIZE) {
-                                chunks.push(base64.substring(k, k + CHUNK_SIZE));
-                            }
-                            const batch = db.batch();
-                            chunks.forEach((chunk, idx) => {
-                                const chunkRef = fileDocRef.collection('chunks').doc(idx.toString().padStart(4, '0'));
-                                batch.set(chunkRef, { data: chunk, index: idx });
-                            });
-                            await batch.commit();
+                    if(!isLarge) {
+                        await fileDocRef.set({ name: file.name, type: file.type, data: base64, isChunked: false });
+                    } else {
+                        await fileDocRef.set({ name: file.name, type: file.type, isChunked: true, totalSize: base64.length });
+                        const chunks = [];
+                        for (let k = 0; k < base64.length; k += CHUNK_SIZE) {
+                            chunks.push(base64.substring(k, k + CHUNK_SIZE));
                         }
-
-                        filesSummary.push({
-                            id: fileDocRef.id,
-                            name: file.name,
-                            type: file.type,
-                            isChunked: isLarge,
-                            uploadDate: new Date().toISOString()
+                        const batch = db.batch();
+                        chunks.forEach((chunk, idx) => {
+                            const chunkRef = fileDocRef.collection('chunks').doc(idx.toString().padStart(4, '0'));
+                            batch.set(chunkRef, { data: chunk, index: idx });
                         });
+                        await batch.commit();
                     }
+
+                    filesSummary.push({
+                        id: fileDocRef.id,
+                        name: file.name,
+                        type: file.type,
+                        isChunked: isLarge,
+                        uploadDate: new Date().toISOString()
+                    });
                 }
 
                 await expenseRef.update({
@@ -570,7 +607,7 @@
                     filesSummary: filesSummary
                 });
 
-                updateProgress(100, "تم الحفظ بنجاح!");
+                updateProgress(100, "تم الحفظ!");
                 setTimeout(() => {
                     closeModal('addExpenseModal');
                     resetModal();
@@ -585,7 +622,7 @@
         }
 
         // ============================================
-        // 5. دوال مساعدة
+        // 5. دوال الواجهة
         // ============================================
         function handleFileSelect(input) {
             const files = input.files;
@@ -599,8 +636,12 @@
             for(let i=0; i<files.length; i++) {
                 selectedFilesRaw.push(files[i]);
                 const div = document.createElement('div');
+                let icon = '📄';
+                if(files[i].type.includes('image')) icon = '🖼️';
+                if(files[i].type.includes('pdf')) icon = '📕';
+                
                 div.className = 'flex justify-between items-center bg-blue-50 p-3 rounded-xl text-sm border border-blue-100 animate-fade-in';
-                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">📄 ${files[i].name}</span><span class="text-xs text-gray-400">جاهز للرفع</span>`;
+                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">${icon} ${files[i].name}</span><span class="text-xs text-gray-400">جاهز للرفع</span>`;
                 list.appendChild(div);
             }
         }
@@ -608,7 +649,6 @@
         function updateProgress(percent, text) {
             document.getElementById('progress-bar').style.width = `${percent}%`;
             document.getElementById('status-text').innerText = text;
-            document.getElementById('status-percent').innerText = `${Math.round(percent)}%`;
         }
 
         function prepareAddExpense() {

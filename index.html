@@ -3,187 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>مدير المصاريف (النسخة المستقرة V15)</title>
+    <title>مدير مصاريف وأصناف المنتجات</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
-    <!-- مكتبات فايربيس (Firestore + Auth فقط) -->
+    <!-- مكتبات فايربيس -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <!-- مكتبة PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
 
     <style>
         body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         .loader { border: 3px solid #e2e8f0; border-top: 3px solid #f59e0b; border-radius: 50%; width: 24px; height: 24px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.25s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         .cat-btn.selected { border-color: #f59e0b; background-color: #fef3c7; transform: scale(0.98); }
         .progress-bar { transition: width 0.1s linear; }
-        
-        /* تنسيق المعاينة المدمجة */
-        .expense-details { transition: max-height 0.3s ease-out, opacity 0.3s ease-out; max-height: 0; opacity: 0; overflow: hidden; }
-        .expense-details.open { max-height: 2000px; opacity: 1; padding-top: 1rem; border-top: 1px solid #f1f5f9; margin-top: 1rem; }
-        
-        /* تنسيق نافذة المعاينة */
         .viewer-iframe { width: 100%; height: 100%; border: none; background: white; }
         .viewer-img { max-width: 100%; max-height: 100%; object-fit: contain; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800 pb-24 select-none">
+<body class="bg-slate-50 text-gray-800 pb-28 select-none">
 
     <!-- شاشة تحميل الاتصال -->
-    <div id="auth-loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
-        <div class="loader mb-4" style="width: 40px; height: 40px; border-width: 4px;"></div>
-        <p class="text-gray-500 font-bold" id="loading-text">جاري تأمين الاتصال...</p>
+    <div id="auth-loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6">
+        <div class="loader mb-4" style="width: 44px; height: 44px; border-width: 4px;"></div>
+        <p class="text-gray-600 font-bold text-base" id="loading-text">جاري الاتصال بقاعدة البيانات...</p>
     </div>
 
-    <!-- 1. الشاشة الرئيسية -->
-    <div id="projects-view" class="p-6 max-w-md mx-auto min-h-screen fade-in hidden">
-        <div class="flex justify-between items-center mb-8 mt-4">
+    <!-- 1. الشاشة الرئيسية: قائمة المشاريع -->
+    <div id="projects-view" class="p-4 sm:p-6 max-w-md mx-auto min-h-screen fade-in hidden">
+        <div class="flex justify-between items-center mb-6 mt-2">
             <div>
-                <h1 class="text-3xl font-extrabold text-gray-900">مشاريعي</h1>
-                <p class="text-gray-500 text-sm">النظام المتكامل (V15)</p>
+                <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">مشاريعي</h1>
+                <p class="text-gray-500 text-xs sm:text-sm mt-0.5">إدارة الأصناف والمصاريف بدقة</p>
             </div>
-            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-yellow-500 font-bold text-xl shadow-sm border border-gray-200">🏢</div>
+            <div class="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 font-bold text-2xl shadow-sm border border-amber-100">
+                📦
+            </div>
         </div>
 
-        <div id="projects-list" class="space-y-4">
+        <div id="projects-list" class="space-y-3">
             <div class="flex justify-center p-10"><div class="loader"></div></div>
         </div>
 
-        <div onclick="openModal('newProjectModal')" class="mt-6 border-2 border-dashed border-gray-300 rounded-2xl p-6 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-yellow-500 hover:text-yellow-500 transition h-32 bg-white active:scale-95 shadow-sm">
-            <span class="text-4xl mb-1">+</span>
-            <span class="font-bold text-sm">مشروع جديد</span>
+        <div onclick="openModal('newProjectModal')" class="mt-5 border-2 border-dashed border-amber-300/80 rounded-2xl p-5 flex flex-col items-center justify-center text-amber-600 cursor-pointer hover:bg-amber-50/50 transition h-28 bg-white active:scale-95 shadow-sm">
+            <span class="text-3xl font-bold mb-1">+</span>
+            <span class="font-bold text-sm">مشروع / محل جديد</span>
         </div>
     </div>
 
-    <!-- 2. شاشة المصاريف -->
-    <div id="expenses-view" class="hidden min-h-screen bg-gray-50 fade-in">
-        <header class="bg-yellow-500 text-white p-6 rounded-b-3xl shadow-lg sticky top-0 z-20">
-            <button onclick="backToProjects()" class="absolute top-6 right-6 p-2 bg-white/20 rounded-lg backdrop-blur-sm active:scale-90 transition hover:bg-white/30">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-            </button>
-            <div class="mt-4">
-                <h1 id="current-project-name" class="text-2xl font-bold truncate pl-8">...</h1>
-                <div class="mt-2 flex items-baseline gap-2">
-                    <h2 class="text-5xl font-extrabold tracking-tight" id="current-project-total">0</h2>
-                    <span class="text-xl opacity-90 font-medium">ريال</span>
+    <!-- 2. شاشة تفاصيل المشروع وقائمة الأصناف -->
+    <div id="expenses-view" class="hidden min-h-screen bg-slate-50 fade-in">
+        <header class="bg-gradient-to-l from-amber-500 to-amber-600 text-white p-5 sm:p-6 rounded-b-[2rem] shadow-lg sticky top-0 z-20">
+            <div class="flex justify-between items-center mb-2">
+                <button onclick="backToProjects()" class="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm active:scale-90 transition hover:bg-white/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                </button>
+                <span class="text-xs bg-black/20 px-3 py-1 rounded-full font-bold">إجمالي المصاريف</span>
+            </div>
+            <div class="mt-1">
+                <h1 id="current-project-name" class="text-xl sm:text-2xl font-bold truncate">...</h1>
+                <div class="mt-1 flex items-baseline gap-2">
+                    <h2 class="text-4xl sm:text-5xl font-black tracking-tight" id="current-project-total">0</h2>
+                    <span class="text-lg opacity-90 font-medium">ريال</span>
                 </div>
             </div>
         </header>
 
-        <div class="container mx-auto px-4 mt-6 pb-24">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-gray-700 text-lg">سجل العمليات</h3>
-                <span id="expense-count" class="text-xs bg-gray-200 px-3 py-1 rounded-full text-gray-600 font-bold">0</span>
+        <div class="max-w-md mx-auto px-4 mt-5 pb-24">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-extrabold text-gray-800 text-base">قائمة الأصناف المضافة</h3>
+                <span id="expense-count" class="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full font-bold">0 صنف</span>
             </div>
             <div id="expenses-list" class="space-y-3 pb-20"></div>
         </div>
 
-        <button onclick="prepareAddExpense()" class="fixed bottom-6 left-6 bg-gray-900 text-white w-16 h-16 rounded-full shadow-2xl z-30 flex items-center justify-center border-4 border-white active:scale-90 transition hover:bg-gray-800">
+        <button onclick="prepareAddExpense()" class="fixed bottom-6 left-6 bg-gray-900 text-white w-16 h-16 rounded-full shadow-2xl z-30 flex items-center justify-center border-4 border-white active:scale-90 transition hover:bg-black">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
         </button>
     </div>
 
-    <!-- 3. نافذة المعاينة الكبيرة -->
-    <div id="fileViewerModal" class="fixed inset-0 bg-black/95 hidden flex items-center justify-center z-[60] backdrop-blur-sm transition-opacity" onclick="closeModal('fileViewerModal')">
+    <!-- 3. نافذة المعاينة الكبيرة للملفات/الصور -->
+    <div id="fileViewerModal" class="fixed inset-0 bg-black/95 hidden flex items-center justify-center z-[60] backdrop-blur-sm" onclick="closeModal('fileViewerModal')">
         <div class="w-full h-full flex flex-col" onclick="event.stopPropagation()">
             <div class="p-4 bg-black/50 flex justify-between items-center backdrop-blur-md absolute top-0 w-full z-10">
-                <h3 class="font-bold text-white truncate text-sm pr-4" id="viewer-filename">معاينة</h3>
-                <button onclick="closeModal('fileViewerModal')" class="text-white bg-white/20 p-2 rounded-full hover:bg-red-500 transition">✕</button>
+                <h3 class="font-bold text-white truncate text-sm pr-2" id="viewer-filename">معاينة المرفق</h3>
+                <button onclick="closeModal('fileViewerModal')" class="text-white bg-white/20 px-3 py-1.5 rounded-xl hover:bg-red-500 transition text-sm font-bold">✕ إغلاق</button>
             </div>
-            
             <div id="viewer-content" class="flex-1 flex items-center justify-center w-full h-full pt-16 pb-20 overflow-y-auto bg-gray-900"></div>
-
-            <div class="p-4 bg-black/50 backdrop-blur-md absolute bottom-0 w-full flex justify-center gap-4 pb-8">
-                <a id="viewer-download-btn" href="#" download class="bg-blue-600 text-white px-6 py-3 rounded-full font-bold hover:bg-blue-700 flex items-center gap-2 shadow-lg active:scale-95 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4 4m4-4v12" /></svg>
-                    تحميل
+            <div class="p-4 bg-black/50 backdrop-blur-md absolute bottom-0 w-full flex justify-center gap-4 pb-6">
+                <a id="viewer-download-btn" href="#" download class="bg-amber-500 text-white px-6 py-2.5 rounded-full font-bold hover:bg-amber-600 flex items-center gap-2 shadow-lg active:scale-95 transition text-sm">
+                    تحميل الملف
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- 4. المودالات الفرعية -->
-    <div id="newProjectModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity">
+    <!-- 4. مودال مشروع جديد -->
+    <div id="newProjectModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
         <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">اسم المشروع الجديد</h3>
-            <input type="text" id="new-project-name" placeholder="مثلاً: بوفيه الحي" class="w-full p-4 bg-gray-50 rounded-xl outline-none text-lg font-bold text-gray-800 mb-6 border-2 border-transparent focus:border-yellow-500 transition-colors bg-gray-100">
-            <button onclick="createNewProject()" class="w-full py-3 bg-yellow-500 text-white rounded-xl font-bold shadow-lg hover:bg-yellow-600 active:scale-95 transition-transform">إنشاء</button>
-            <button onclick="closeModal('newProjectModal')" class="w-full mt-3 py-3 text-gray-500 font-bold hover:text-gray-700">إلغاء</button>
+            <h3 class="text-lg font-bold text-gray-800 mb-3">اسم المشروع / المحل</h3>
+            <input type="text" id="new-project-name" placeholder="مثال: مطعم الفلاح، ديكور الصالة..." class="w-full p-3.5 bg-gray-50 rounded-xl outline-none text-base font-bold text-gray-800 mb-4 border border-gray-200 focus:border-amber-500 transition-colors">
+            <div class="flex gap-2">
+                <button onclick="createNewProject()" class="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 active:scale-95 transition">إنشاء</button>
+                <button onclick="closeModal('newProjectModal')" class="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition">إلغاء</button>
+            </div>
         </div>
     </div>
 
+    <!-- 5. مودال إضافة / تعديل صنف -->
     <div id="addExpenseModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl h-[90vh] sm:h-auto overflow-y-auto relative">
-            <div class="flex justify-between items-center mb-6 sticky top-0 bg-white z-10 pb-2 border-b border-gray-100">
-                <h3 class="text-xl font-bold text-gray-800" id="modal-title">إضافة مصروف</h3>
-                <button onclick="closeModal('addExpenseModal')" class="bg-gray-100 p-2 rounded-full text-gray-600 hover:bg-gray-200">✕</button>
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto relative">
+            <div class="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-2 border-b border-gray-100">
+                <h3 class="text-lg font-bold text-gray-800" id="modal-title">إضافة صنف جديد</h3>
+                <button onclick="closeModal('addExpenseModal')" class="bg-gray-100 w-8 h-8 rounded-full text-gray-500 flex items-center justify-center hover:bg-gray-200">✕</button>
             </div>
             
             <input type="hidden" id="editing-expense-id">
 
-            <div class="space-y-5">
-                <div class="bg-yellow-50 p-4 rounded-2xl border border-yellow-200">
-                    <label class="text-xs text-yellow-700 font-bold block mb-1">المبلغ</label>
-                    <div class="flex items-center">
-                        <input type="number" id="exp-amount" placeholder="0" class="w-full bg-transparent text-4xl font-extrabold text-gray-900 outline-none placeholder-gray-400" inputmode="numeric">
-                        <span class="text-gray-500 font-bold text-lg">ريال</span>
+            <div class="space-y-4">
+                <!-- 1. اسم الصنف / المنتج -->
+                <div>
+                    <label class="text-xs text-gray-600 font-bold block mb-1">اسم الصنف / المنتج</label>
+                    <input type="text" id="exp-name" placeholder="مثال: كراسي طاولة، كيس بهارات، بلاط..." class="w-full p-3 bg-gray-50 rounded-xl outline-none text-base font-bold text-gray-800 border border-gray-200 focus:border-amber-500 transition">
+                </div>
+
+                <!-- 2. الكمية وسعر الحبة -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-gray-600 font-bold block mb-1">الكمية المطلوبة</label>
+                        <input type="number" id="exp-qty" placeholder="مثال: 100" oninput="calculateTotal()" class="w-full p-3 bg-gray-50 rounded-xl outline-none text-base font-bold text-gray-800 border border-gray-200 focus:border-amber-500 transition" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-600 font-bold block mb-1">سعر الحبة الواحدة (ر.س)</label>
+                        <input type="number" step="any" id="exp-unit-price" placeholder="مثال: 15.5" oninput="calculateTotal()" class="w-full p-3 bg-gray-50 rounded-xl outline-none text-base font-bold text-gray-800 border border-gray-200 focus:border-amber-500 transition" inputmode="decimal">
                     </div>
                 </div>
 
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <label class="text-xs text-gray-500 font-bold block mb-1">البيان (الغرض)</label>
-                    <input type="text" id="exp-name" placeholder="اكتب اسم الغرض..." class="w-full bg-transparent outline-none text-lg font-bold text-gray-800 placeholder-gray-400">
+                <!-- 3. الإجمالي المحسوب آلياً -->
+                <div class="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 flex justify-between items-center">
+                    <div>
+                        <span class="text-xs text-amber-800 font-bold block">المبلغ الإجمالي المحسوب</span>
+                        <span class="text-[11px] text-amber-600">(الكمية × سعر الحبة)</span>
+                    </div>
+                    <div class="flex items-baseline gap-1">
+                        <input type="number" id="exp-amount" readonly class="w-32 bg-transparent text-2xl font-black text-amber-700 outline-none text-left" placeholder="0">
+                        <span class="text-sm font-bold text-amber-700">ريال</span>
+                    </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                    <div onclick="selectCategory(this, 'equipment')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">🥘</div><div class="text-xs font-bold text-gray-600">معدات</div></div>
-                    <div onclick="selectCategory(this, 'goods')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">📦</div><div class="text-xs font-bold text-gray-600">بضاعة</div></div>
-                    <div onclick="selectCategory(this, 'decor')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">🎨</div><div class="text-xs font-bold text-gray-600">ديكور</div></div>
-                    <div onclick="selectCategory(this, 'gov')" class="cat-btn p-3 rounded-xl bg-white text-center cursor-pointer hover:shadow-sm"><div class="text-2xl mb-1">⚖️</div><div class="text-xs font-bold text-gray-600">حكومي</div></div>
+                <!-- 4. التصنيف -->
+                <div>
+                    <label class="text-xs text-gray-600 font-bold block mb-1.5">التصنيف</label>
+                    <div class="grid grid-cols-4 gap-2 text-center">
+                        <div onclick="selectCategory(this, 'goods')" class="cat-btn p-2 rounded-xl bg-white text-center cursor-pointer border border-gray-200">
+                            <div class="text-xl">📦</div><div class="text-[11px] font-bold text-gray-700">بضاعة</div>
+                        </div>
+                        <div onclick="selectCategory(this, 'equipment')" class="cat-btn p-2 rounded-xl bg-white text-center cursor-pointer border border-gray-200">
+                            <div class="text-xl">🥘</div><div class="text-[11px] font-bold text-gray-700">معدات</div>
+                        </div>
+                        <div onclick="selectCategory(this, 'decor')" class="cat-btn p-2 rounded-xl bg-white text-center cursor-pointer border border-gray-200">
+                            <div class="text-xl">🎨</div><div class="text-[11px] font-bold text-gray-700">ديكور</div>
+                        </div>
+                        <div onclick="selectCategory(this, 'gov')" class="cat-btn p-2 rounded-xl bg-white text-center cursor-pointer border border-gray-200">
+                            <div class="text-xl">⚖️</div><div class="text-[11px] font-bold text-gray-700">حكومي</div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="exp-cat" value="goods">
                 </div>
-                <input type="hidden" id="exp-cat" value="other">
 
+                <!-- 5. المرفقات الحالية عند التعديل -->
                 <div id="current-attachments-area" class="hidden">
-                    <label class="text-xs text-gray-500 font-bold block mb-2">المرفقات الحالية:</label>
-                    <div id="current-attachments-list" class="space-y-2"></div>
+                    <label class="text-xs text-gray-500 font-bold block mb-1.5">المرفقات الحالية:</label>
+                    <div id="current-attachments-list" class="space-y-1.5"></div>
                 </div>
 
-                <div class="mt-2">
-                    <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-6 text-center cursor-pointer hover:bg-gray-50 hover:border-gray-400 transition relative group bg-white">
+                <!-- 6. رفع صورة الصنف / الفاتورة -->
+                <div>
+                    <label class="text-xs text-gray-600 font-bold block mb-1">صورة الصنف أو الفاتورة</label>
+                    <label class="block w-full border-2 border-dashed border-gray-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-amber-50/30 hover:border-amber-400 transition bg-gray-50">
                         <input type="file" id="exp-files" class="hidden" multiple accept="*/*" onchange="handleFileSelect(this)">
                         <div id="upload-placeholder">
-                            <div class="mx-auto w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            <div class="mx-auto w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-1.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                             </div>
-                            <span class="text-sm font-bold text-gray-700">إضافة ملفات (صور، PDF، مستندات)</span>
-                            <p class="text-xs text-gray-400 mt-1">اضغط هنا للاختيار</p>
+                            <span class="text-xs font-bold text-gray-700">اضغط لالتقاط أو اختيار صورة المنتج</span>
                         </div>
                     </label>
-                    <div id="selected-files-list" class="mt-3 space-y-2 hidden"></div>
+                    <div id="selected-files-list" class="mt-2 space-y-1.5 hidden"></div>
                     
-                    <div id="status-bar" class="hidden mt-4 text-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                        <div class="flex justify-between text-xs mb-2">
-                            <span id="status-text" class="font-bold text-blue-600">جاري الرفع...</span>
+                    <div id="status-bar" class="hidden mt-3 text-center bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span id="status-text" class="font-bold text-amber-600">جاري المعالجة...</span>
                             <span id="status-percent" class="font-bold text-gray-500">0%</span>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar shadow-lg" style="width: 0%"></div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div id="progress-bar" class="bg-amber-500 h-2 rounded-full progress-bar" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>
 
-                <button onclick="saveExpense()" id="save-btn" class="w-full py-4 mt-4 bg-gray-900 text-white rounded-xl font-bold shadow-xl hover:bg-gray-800 active:scale-95 transition-all flex justify-center items-center gap-2 text-lg">
-                    <span>حفظ العملية</span>
+                <button onclick="saveExpense()" id="save-btn" class="w-full py-3.5 bg-gray-900 text-white rounded-xl font-bold shadow-lg hover:bg-black active:scale-95 transition text-base mt-2">
+                    حفظ الصنف
                 </button>
             </div>
         </div>
     </div>
 
     <script>
-        // إعدادات فايربيس
         const firebaseConfig = {
           apiKey: "AIzaSyCRbN9PDuoqZ60BAU79S-cY_ka9dtLerL4",
           authDomain: "baba-app-final.firebaseapp.com",
@@ -198,7 +231,6 @@
         const auth = firebase.auth();
         const db = firebase.firestore();
 
-        // 1. المصادقة التلقائية (لحل مشاكل التصاريح)
         auth.signInAnonymously()
             .then(() => {
                 document.getElementById('auth-loading').classList.add('hidden');
@@ -207,7 +239,7 @@
             })
             .catch((error) => {
                 console.error("Login failed", error);
-                document.getElementById('loading-text').innerText = "فشل الاتصال! تأكد من الإنترنت";
+                document.getElementById('loading-text').innerText = "فشل الاتصال! يرجى التأكد من تشغيل الإنترنت.";
                 document.getElementById('loading-text').classList.add('text-red-500');
             });
 
@@ -215,31 +247,37 @@
         let unsubscribe = null;
         let selectedFilesRaw = [];
         let currentAttachments = [];
-        const CHUNK_SIZE = 800 * 1024; // 800KB chunks
+        const CHUNK_SIZE = 800 * 1024;
 
-        // 2. إدارة المشاريع
+        function calculateTotal() {
+            const qty = parseFloat(document.getElementById('exp-qty').value) || 0;
+            const unitPrice = parseFloat(document.getElementById('exp-unit-price').value) || 0;
+            const total = qty * unitPrice;
+            document.getElementById('exp-amount').value = total ? total.toFixed(2).replace(/\.00$/, '') : '';
+        }
+
         function initializeRealtimeListeners() {
             db.collection("projects").orderBy("createdAt", "desc").onSnapshot(snapshot => {
                 const list = document.getElementById('projects-list');
                 list.innerHTML = "";
                 if (snapshot.empty) {
-                    list.innerHTML = `<div class="text-center p-10 bg-white rounded-3xl border-2 border-dashed border-gray-200 text-gray-400 font-medium">لا توجد مشاريع حالياً<br>ابدأ بإنشاء واحد جديد</div>`;
+                    list.innerHTML = `<div class="text-center p-8 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-400 font-bold text-sm">لا توجد مشاريع مضافة حالياً.<br>اضغط بالأسفل لإنشاء مشروع.</div>`;
                     return;
                 }
                 snapshot.forEach(doc => {
                     const data = doc.data();
                     list.innerHTML += `
-                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between active:scale-95 transition-transform cursor-pointer mb-3 hover:shadow-md" onclick="openProject('${doc.id}', '${data.name}', ${data.totalAmount || 0})">
-                        <div class="flex items-center gap-4">
-                            <div class="w-14 h-14 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl shadow-inner">📂</div>
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between active:scale-[0.98] transition cursor-pointer mb-2.5" onclick="openProject('${doc.id}', '${data.name}', ${data.totalAmount || 0})">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl shadow-inner font-bold">📂</div>
                             <div>
-                                <h3 class="font-bold text-gray-800 text-lg">${data.name}</h3>
-                                <p class="text-xs text-gray-400 font-medium mt-1">اضغط للدخول</p>
+                                <h3 class="font-bold text-gray-800 text-base leading-snug">${data.name}</h3>
+                                <p class="text-[11px] text-gray-400 font-medium mt-0.5">اضغط لفتح الأصناف والمصاريف</p>
                             </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="font-extrabold text-gray-900 text-lg bg-gray-50 px-3 py-1 rounded-lg">${(data.totalAmount || 0).toLocaleString()}</span>
-                            <button onclick="deleteProject(event, '${doc.id}', '${data.name}')" class="bg-red-50 text-red-500 w-10 h-10 flex items-center justify-center rounded-xl hover:bg-red-500 hover:text-white transition shadow-sm border border-red-100">🗑️</button>
+                        <div class="flex items-center gap-2">
+                            <span class="font-black text-gray-900 text-base bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-100">${(data.totalAmount || 0).toLocaleString()} <span class="text-xs font-normal text-gray-500">ر.س</span></span>
+                            <button onclick="deleteProject(event, '${doc.id}', '${data.name}')" class="bg-red-50 text-red-500 w-9 h-9 flex items-center justify-center rounded-lg hover:bg-red-500 hover:text-white transition">🗑️</button>
                         </div>
                     </div>`;
                 });
@@ -248,19 +286,18 @@
 
         async function deleteProject(e, id, name) {
             e.stopPropagation();
-            if(confirm(`هل أنت متأكد تماماً من حذف مشروع "${name}"؟`)) {
+            if(confirm(`هل تريد بالتأكيد حذف مشروع "${name}" مع كافة الأصناف المسجلة داخله؟`)) {
                 await db.collection("projects").doc(id).delete();
             }
         }
 
         function createNewProject() {
             const name = document.getElementById('new-project-name').value.trim();
-            if(!name) return alert("الرجاء كتابة اسم المشروع");
+            if(!name) return alert("يرجى كتابة اسم المشروع أو المحل");
             db.collection("projects").add({ name: name, totalAmount: 0, createdAt: new Date() })
             .then(() => { closeModal('newProjectModal'); document.getElementById('new-project-name').value = ""; });
         }
 
-        // 3. إدارة المصاريف
         function openProject(id, name, total) {
             currentProjectId = id;
             document.getElementById('projects-view').classList.add('hidden');
@@ -276,9 +313,9 @@
                 let totalCalc = 0;
                 
                 if(snapshot.empty) {
-                    list.innerHTML = `<div class="flex flex-col items-center justify-center py-20 text-gray-400 opacity-60"><div class="text-6xl mb-4">🧾</div><p class="font-bold">لا توجد مصاريف مسجلة</p></div>`;
+                    list.innerHTML = `<div class="flex flex-col items-center justify-center py-16 text-gray-400"><div class="text-5xl mb-3">📋</div><p class="font-bold text-sm">لا توجد أصناف مضافة في هذا المشروع</p></div>`;
                     document.getElementById('current-project-total').innerText = "0";
-                    document.getElementById('expense-count').innerText = "0";
+                    document.getElementById('expense-count').innerText = "0 صنف";
                     db.collection("projects").doc(id).update({ totalAmount: 0 });
                     return;
                 }
@@ -287,63 +324,73 @@
                     const data = doc.data();
                     const expenseId = doc.id;
                     const amt = Number(data.amount) || 0;
+                    const qty = data.quantity || 1;
+                    const unitPrice = data.unitPrice || (amt / qty);
                     totalCalc += amt;
                     
-                    let icon = '🧾'; let color = 'bg-gray-100 text-gray-600';
-                    if(data.category === 'gov') { icon = '⚖️'; color = 'bg-red-50 text-red-600'; }
-                    if(data.category === 'equipment') { icon = '🥘'; color = 'bg-orange-50 text-orange-600'; }
-                    if(data.category === 'decor') { icon = '🎨'; color = 'bg-purple-50 text-purple-600'; }
-                    if(data.category === 'goods') { icon = '📦'; color = 'bg-blue-50 text-blue-600'; }
+                    let icon = '📦'; let catLabel = 'بضاعة';
+                    if(data.category === 'gov') { icon = '⚖️'; catLabel = 'حكومي'; }
+                    if(data.category === 'equipment') { icon = '🥘'; catLabel = 'معدات'; }
+                    if(data.category === 'decor') { icon = '🎨'; catLabel = 'ديكور'; }
 
-                    const safeName = data.name ? data.name.replace(/'/g, "\\'") : "بدون اسم";
-                    const dateStr = data.date ? new Date(data.date.toDate()).toLocaleDateString('en-GB') : '';
-                    
+                    const safeName = data.name ? data.name.replace(/'/g, "\\'") : "صنف بدون اسم";
+                    const dateStr = data.date ? new Date(data.date.toDate()).toLocaleDateString('ar-EG') : '';
                     const filesSummary = data.filesSummary || [];
-                    let detailsHTML = '';
                     
+                    let attachmentsHTML = '';
                     if(filesSummary.length > 0) {
-                        detailsHTML = `<div id="attachments-${expenseId}" class="expense-details">
-                            <div class="grid grid-cols-2 gap-2 mt-2 border-t pt-2">`;
+                        attachmentsHTML = `<div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-gray-100">`;
                         filesSummary.forEach(file => {
                             let typeIcon = '📄';
                             if(file.type.includes('image')) typeIcon = '🖼️';
                             else if(file.type.includes('pdf')) typeIcon = '📕';
-                            else if(file.type.includes('sheet') || file.type.includes('excel')) typeIcon = '📊';
                             
-                            detailsHTML += `
-                            <div onclick="event.stopPropagation(); previewFile('${expenseId}', '${file.id}', '${file.name}', ${file.isChunked}, '${file.type}')" class="bg-gray-50 border rounded-lg p-2 flex items-center gap-2 cursor-pointer hover:bg-gray-100 transition">
-                                <span class="text-xl">${typeIcon}</span>
+                            attachmentsHTML += `
+                            <div onclick="event.stopPropagation(); previewFile('${expenseId}', '${file.id}', '${file.name}', ${file.isChunked}, '${file.type}')" class="bg-amber-50/60 border border-amber-200/60 rounded-xl p-2 flex items-center gap-2 cursor-pointer hover:bg-amber-100/50 transition">
+                                <span class="text-lg">${typeIcon}</span>
                                 <div class="overflow-hidden">
-                                    <p class="text-xs font-bold text-gray-700 truncate w-24">${file.name}</p>
-                                    <p class="text-[10px] text-blue-500 font-bold">اضغط للمعاينة</p>
+                                    <p class="text-xs font-bold text-gray-800 truncate w-24">${file.name}</p>
+                                    <p class="text-[10px] text-amber-700 font-bold">معاينة الصورة</p>
                                 </div>
                             </div>`;
                         });
-                        detailsHTML += `</div></div>`;
-                    } else {
-                        detailsHTML = `<div id="attachments-${expenseId}" class="expense-details"><div class="text-center text-gray-400 text-sm py-2">لا توجد مرفقات</div></div>`;
+                        attachmentsHTML += `</div>`;
                     }
 
                     list.innerHTML += `
-                    <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-col mb-3 animate-fade-in cursor-pointer transition hover:shadow-md" onclick="toggleDetails('${expenseId}')">
-                        <div class="flex justify-between items-start w-full mb-2">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col mb-2.5 animate-fade-in">
+                        <div class="flex justify-between items-start gap-2">
                             <div class="flex items-center gap-3 overflow-hidden">
-                                <div class="${color} w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-sm">${icon}</div>
+                                <div class="w-11 h-11 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center text-xl shrink-0 border border-amber-100">
+                                    ${icon}
+                                </div>
                                 <div class="overflow-hidden">
-                                    <h4 class="font-bold text-gray-800 text-lg truncate">${safeName}</h4>
-                                    <div class="text-xs text-gray-400 font-medium flex items-center gap-1">📅 ${dateStr}</div>
+                                    <h4 class="font-extrabold text-gray-900 text-base leading-tight truncate">${safeName}</h4>
+                                    <div class="text-[11px] text-gray-400 font-medium flex items-center gap-2 mt-0.5">
+                                        <span>📅 ${dateStr}</span>
+                                        <span>•</span>
+                                        <span class="text-amber-700 font-bold">${catLabel}</span>
+                                    </div>
                                 </div>
                             </div>
-                            <span class="font-extrabold text-red-500 text-xl flex-shrink-0">-${amt.toLocaleString()}</span>
+                            <div class="text-left shrink-0">
+                                <div class="font-black text-red-600 text-lg sm:text-xl">-${amt.toLocaleString()} <span class="text-xs font-bold text-gray-500">ر.س</span></div>
+                            </div>
+                        </div>
+
+                        <!-- تفاصيل الكمية وسعر الحبة المنظمة -->
+                        <div class="grid grid-cols-2 gap-2 mt-3 bg-gray-50 p-2.5 rounded-xl text-xs border border-gray-100 font-bold text-gray-700">
+                            <div>الكمية: <span class="text-amber-700 font-extrabold text-sm">${qty}</span></div>
+                            <div class="text-left">سعر الحبة: <span class="text-amber-700 font-extrabold text-sm">${Number(unitPrice).toLocaleString()}</span> ر.س</div>
                         </div>
                         
-                        ${detailsHTML}
+                        ${attachmentsHTML}
 
-                        <div id="controls-${expenseId}" class="expense-details flex justify-end gap-2 border-t border-gray-50 pt-3">
-                            <button onclick="event.stopPropagation(); prepareEditExpense('${expenseId}', '${safeName}', '${amt}', '${data.category}')" class="text-blue-600 bg-blue-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-blue-100 transition">
+                        <div class="flex justify-end gap-2 mt-3 pt-2.5 border-t border-gray-100">
+                            <button onclick="prepareEditExpense('${expenseId}', '${safeName}', '${amt}', '${qty}', '${unitPrice}', '${data.category}')" class="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition">
                                 ✏️ تعديل
                             </button>
-                            <button onclick="event.stopPropagation(); deleteExpense('${expenseId}')" class="text-red-600 bg-red-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-red-100 transition">
+                            <button onclick="deleteExpense('${expenseId}')" class="text-red-600 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition">
                                 🗑️ حذف
                             </button>
                         </div>
@@ -351,25 +398,11 @@
                 });
                 
                 document.getElementById('current-project-total').innerText = totalCalc.toLocaleString();
-                document.getElementById('expense-count').innerText = snapshot.size;
+                document.getElementById('expense-count').innerText = `${snapshot.size} صنف`;
                 db.collection("projects").doc(id).update({ totalAmount: totalCalc });
             });
         }
 
-        function toggleDetails(expenseId) {
-            const detailsDiv = document.getElementById(`attachments-${expenseId}`);
-            const controlsDiv = document.getElementById(`controls-${expenseId}`);
-            if (detailsDiv.classList.contains('open')) {
-                detailsDiv.classList.remove('open');
-                controlsDiv.classList.remove('open');
-            } else {
-                document.querySelectorAll('.expense-details.open').forEach(el => el.classList.remove('open'));
-                detailsDiv.classList.add('open');
-                controlsDiv.classList.add('open');
-            }
-        }
-
-        // 4. المعاينة
         async function previewFile(expenseId, fileId, fileName, isChunked, fileType) {
             const modal = document.getElementById('fileViewerModal');
             const content = document.getElementById('viewer-content');
@@ -377,33 +410,30 @@
             const dlBtn = document.getElementById('viewer-download-btn');
             
             title.innerText = fileName;
-            content.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader mb-4"></div><span class="text-white text-sm">جاري جلب الملف...</span></div>`;
+            content.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader mb-3"></div><span class="text-white text-xs">جاري فتح المرفق...</span></div>`;
             modal.classList.remove('hidden');
 
             try {
                 const base64Data = await getFileData(expenseId, fileId, isChunked);
-                
                 dlBtn.href = base64Data;
                 dlBtn.download = fileName;
-
                 content.innerHTML = '';
                 
                 if (fileType.startsWith('image/')) {
-                    content.innerHTML = `<img src="${base64Data}" class="viewer-img shadow-2xl rounded-lg max-h-full max-w-full object-contain">`;
+                    content.innerHTML = `<img src="${base64Data}" class="viewer-img shadow-2xl rounded-xl max-h-full max-w-full object-contain p-2">`;
                 } else if (fileType === 'application/pdf') {
-                    content.innerHTML = `<iframe src="${base64Data}" class="viewer-iframe w-full h-full rounded shadow-lg bg-white"></iframe>`;
+                    content.innerHTML = `<iframe src="${base64Data}" class="viewer-iframe w-full h-full bg-white"></iframe>`;
                 } else {
                     content.innerHTML = `
-                        <div class="text-center p-10 bg-white rounded-2xl shadow-lg">
-                            <div class="text-6xl mb-4">📂</div>
-                            <h3 class="font-bold text-gray-800 mb-2 text-xl">ملف ${fileType.split('/')[1] || 'خارجي'}</h3>
-                            <p class="text-sm text-gray-500">لا يمكن معاينة هذا النوع مباشرة.</p>
-                            <p class="text-xs text-blue-500 mt-4">استخدم زر التحميل في الأسفل</p>
+                        <div class="text-center p-6 bg-white rounded-2xl shadow-xl max-w-xs mx-auto">
+                            <div class="text-5xl mb-3">📄</div>
+                            <h3 class="font-bold text-gray-800 text-sm mb-1">${fileName}</h3>
+                            <p class="text-xs text-gray-500 mb-4">اضغط على زر التحميل بالأسفل لفتح الملف</p>
                         </div>
                     `;
                 }
             } catch (e) {
-                content.innerHTML = `<div class="text-red-500 font-bold bg-white p-4 rounded-lg">حدث خطأ أثناء عرض الملف: ${e.message}</div>`;
+                content.innerHTML = `<div class="text-red-500 font-bold bg-white p-4 rounded-xl text-xs">تعذر فتح الملف: ${e.message}</div>`;
             }
         }
 
@@ -424,7 +454,6 @@
 
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        // 5. الرفع والحفظ (Firestore Only)
         function readFileAsBase64(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -437,13 +466,17 @@
         async function saveExpense() {
             const btn = document.getElementById('save-btn');
             const editId = document.getElementById('editing-expense-id').value;
+            const name = document.getElementById('exp-name').value.trim();
+            const qty = parseFloat(document.getElementById('exp-qty').value) || 0;
+            const unitPrice = parseFloat(document.getElementById('exp-unit-price').value) || 0;
             const amt = document.getElementById('exp-amount').value;
-            const name = document.getElementById('exp-name').value;
             const cat = document.getElementById('exp-cat').value;
 
-            if(!amt || !name) return alert("الرجاء تعبئة البيانات");
+            if(!name) return alert("يرجى إدخال اسم الصنف / المنتج");
+            if(!qty || qty <= 0) return alert("يرجى إدخال كمية صحيحة");
+            if(!unitPrice || unitPrice <= 0) return alert("يرجى إدخال سعر الحبة الواحدة");
             
-            btn.innerText = "جاري الحفظ...";
+            btn.innerText = "جاري الحفظ الدائم...";
             btn.disabled = true;
             document.getElementById('status-bar').classList.remove('hidden');
             
@@ -456,8 +489,10 @@
                     filesSummary = currentAttachments.filter(f => !f.deleted);
                 } else {
                     expenseRef = await db.collection("projects").doc(currentProjectId).collection("expenses").add({
-                        amount: Number(amt),
                         name: name,
+                        quantity: qty,
+                        unitPrice: unitPrice,
+                        amount: Number(amt),
                         category: cat,
                         date: new Date(),
                         filesSummary: []
@@ -467,7 +502,7 @@
                 for(let i=0; i < selectedFilesRaw.length; i++) {
                     const file = selectedFilesRaw[i];
                     const progress = ((i / selectedFilesRaw.length) * 100);
-                    updateProgress(progress, `جاري رفع: ${file.name}`);
+                    updateProgress(progress, `جاري رفع وحفظ الصورة: ${file.name}`);
 
                     const base64 = await readFileAsBase64(file);
                     const isLarge = base64.length > CHUNK_SIZE;
@@ -499,8 +534,10 @@
                 }
 
                 await expenseRef.update({
-                    amount: Number(amt),
                     name: name,
+                    quantity: qty,
+                    unitPrice: unitPrice,
+                    amount: Number(amt),
                     category: cat,
                     filesSummary: filesSummary
                 });
@@ -509,35 +546,28 @@
                 setTimeout(() => {
                     closeModal('addExpenseModal');
                     resetModal();
-                }, 500);
+                }, 400);
 
             } catch(e) {
-                alert("حدث خطأ: " + e.message);
+                alert("حدث خطأ أثناء الحفظ: " + e.message);
                 console.error(e);
                 btn.disabled = false;
-                btn.innerText = "حاول مرة أخرى";
+                btn.innerText = "حاول مجدداً";
             }
         }
 
-        // دوال مساعدة
         function handleFileSelect(input) {
             const files = input.files;
             const list = document.getElementById('selected-files-list');
-            
             if (files.length > 0) {
                 document.getElementById('upload-placeholder').classList.add('hidden');
                 list.classList.remove('hidden');
             }
-            
             for(let i=0; i<files.length; i++) {
                 selectedFilesRaw.push(files[i]);
                 const div = document.createElement('div');
-                let icon = '📄';
-                if(files[i].type.includes('image')) icon = '🖼️';
-                if(files[i].type.includes('pdf')) icon = '📕';
-                
-                div.className = 'flex justify-between items-center bg-blue-50 p-3 rounded-xl text-sm border border-blue-100 animate-fade-in';
-                div.innerHTML = `<span class="truncate w-48 font-bold text-blue-700">${icon} ${files[i].name}</span><span class="text-xs text-gray-400">جاهز للرفع</span>`;
+                div.className = 'flex justify-between items-center bg-amber-50 p-2.5 rounded-xl text-xs border border-amber-100 animate-fade-in font-bold text-gray-700';
+                div.innerHTML = `<span class="truncate w-44">🖼️ ${files[i].name}</span><span class="text-amber-700">جاهز للحفظ</span>`;
                 list.appendChild(div);
             }
         }
@@ -550,18 +580,21 @@
 
         function prepareAddExpense() {
             resetModal();
-            document.getElementById('modal-title').innerText = "إضافة مصروف";
-            document.getElementById('save-btn').innerText = "حفظ العملية";
+            document.getElementById('modal-title').innerText = "إضافة صنف جديد";
+            document.getElementById('save-btn').innerText = "حفظ الصنف";
+            selectCategory(document.querySelector('.cat-btn'), 'goods');
             openModal('addExpenseModal');
         }
 
-        async function prepareEditExpense(id, name, amount, category) {
+        async function prepareEditExpense(id, name, amount, quantity, unitPrice, category) {
             resetModal();
-            document.getElementById('modal-title').innerText = "تعديل المصروف";
+            document.getElementById('modal-title').innerText = "تعديل بيانات الصنف";
             document.getElementById('editing-expense-id').value = id;
-            document.getElementById('exp-amount').value = amount;
             document.getElementById('exp-name').value = name;
-            document.getElementById('exp-cat').value = category;
+            document.getElementById('exp-qty').value = quantity || 1;
+            document.getElementById('exp-unit-price').value = unitPrice || (amount / (quantity || 1));
+            document.getElementById('exp-amount').value = amount;
+            document.getElementById('exp-cat').value = category || 'goods';
             document.getElementById('save-btn').innerText = "حفظ التعديلات";
 
             document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -580,9 +613,9 @@
                 listDiv.innerHTML = "";
                 currentAttachments.forEach((file, idx) => {
                     listDiv.innerHTML += `
-                    <div class="flex justify-between items-center bg-white border border-gray-200 p-2 rounded-xl text-sm" id="curr-file-${idx}">
-                        <span class="truncate w-40 font-bold text-gray-600">📎 ${file.name}</span>
-                        <button onclick="markDeleted(${idx})" class="text-red-500 text-xs font-bold px-3 py-1 bg-red-50 rounded-lg hover:bg-red-100">حذف</button>
+                    <div class="flex justify-between items-center bg-gray-50 border border-gray-200 p-2 rounded-xl text-xs font-bold" id="curr-file-${idx}">
+                        <span class="truncate w-40 text-gray-700">📎 ${file.name}</span>
+                        <button onclick="markDeleted(${idx})" class="text-red-500 bg-red-50 px-2 py-1 rounded-md hover:bg-red-100">حذف</button>
                     </div>`;
                 });
             }
@@ -591,15 +624,17 @@
 
         function markDeleted(index) {
             const item = document.getElementById(`curr-file-${index}`);
-            item.style.opacity = "0.4";
+            item.style.opacity = "0.35";
             item.style.pointerEvents = "none";
             currentAttachments[index].deleted = true;
         }
 
         function resetModal() {
             document.getElementById('editing-expense-id').value = "";
-            document.getElementById('exp-amount').value = "";
             document.getElementById('exp-name').value = "";
+            document.getElementById('exp-qty').value = "";
+            document.getElementById('exp-unit-price').value = "";
+            document.getElementById('exp-amount').value = "";
             document.getElementById('exp-files').value = "";
             document.getElementById('current-attachments-area').classList.add('hidden');
             document.getElementById('selected-files-list').innerHTML = "";
@@ -607,20 +642,18 @@
             document.getElementById('upload-placeholder').classList.remove('hidden');
             document.getElementById('status-bar').classList.add('hidden');
             document.getElementById('save-btn').disabled = false;
-            document.getElementById('save-btn').innerText = "حفظ العملية";
+            document.getElementById('save-btn').innerText = "حفظ الصنف";
             selectedFilesRaw = [];
             currentAttachments = [];
-            selectCategory(document.querySelector('.cat-btn'), 'other');
         }
 
         function deleteExpense(id) {
-            if(confirm("حذف هذا المصروف؟")) {
+            if(confirm("هل تريد بالتأكيد حذف هذا الصنف ومرفقاته؟")) {
                 db.collection("projects").doc(currentProjectId).collection("expenses").doc(id).delete();
             }
         }
 
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
         function backToProjects() { 
             document.getElementById('expenses-view').classList.add('hidden');
             document.getElementById('projects-view').classList.remove('hidden');

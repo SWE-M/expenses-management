@@ -5,16 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>مدير مصاريف وأصناف المنتجات</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
     
     <!-- مكتبات فايربيس -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     
-    <!-- مكتبة PDF.js -->
+    <!-- مكتبة PDF.js لعرض المرفقات -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
+
+    <!-- مكتبات تصدير PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <style>
         body { font-family: 'Tajawal', sans-serif; background-color: #f8fafc; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -26,6 +30,19 @@
         .progress-bar { transition: width 0.1s linear; }
         .viewer-iframe { width: 100%; height: 100%; border: none; background: white; }
         .viewer-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        
+        /* تنسيق قالب الفاتورة المجهزة للتصدير */
+        #invoice-render-area {
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            width: 800px;
+            background: #ffffff;
+            color: #1e293b;
+            padding: 40px;
+            box-sizing: border-box;
+            font-family: 'Tajawal', sans-serif;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-gray-800 pb-28 select-none">
@@ -41,7 +58,7 @@
         <div class="flex justify-between items-center mb-6 mt-2">
             <div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900">مشاريعي</h1>
-                <p class="text-gray-500 text-xs sm:text-sm mt-0.5">إدارة الأصناف والمصاريف بدقة</p>
+                <p class="text-gray-500 text-xs sm:text-sm mt-0.5">إدارة الأصناف وتصدير الفواتير</p>
             </div>
             <div class="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 font-bold text-2xl shadow-sm border border-amber-100">
                 📦
@@ -65,7 +82,12 @@
                 <button onclick="backToProjects()" class="p-2.5 bg-white/20 rounded-xl backdrop-blur-sm active:scale-90 transition hover:bg-white/30">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </button>
-                <span class="text-xs bg-black/20 px-3 py-1 rounded-full font-bold">إجمالي المصاريف</span>
+                
+                <!-- زر تصدير الفاتورة PDF -->
+                <button onclick="generateInvoicePDF()" id="export-pdf-btn" class="flex items-center gap-1.5 bg-white text-amber-700 px-3.5 py-1.5 rounded-xl font-extrabold text-xs shadow-md active:scale-95 transition hover:bg-amber-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span>تصدير فاتورة PDF</span>
+                </button>
             </div>
             <div class="mt-1">
                 <h1 id="current-project-name" class="text-xl sm:text-2xl font-bold truncate">...</h1>
@@ -128,13 +150,11 @@
             <input type="hidden" id="editing-expense-id">
 
             <div class="space-y-4">
-                <!-- 1. اسم الصنف / المنتج -->
                 <div>
                     <label class="text-xs text-gray-600 font-bold block mb-1">اسم الصنف / المنتج</label>
                     <input type="text" id="exp-name" placeholder="مثال: كراسي طاولة، كيس بهارات، بلاط..." class="w-full p-3 bg-gray-50 rounded-xl outline-none text-base font-bold text-gray-800 border border-gray-200 focus:border-amber-500 transition">
                 </div>
 
-                <!-- 2. الكمية وسعر الحبة -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-xs text-gray-600 font-bold block mb-1">الكمية المطلوبة</label>
@@ -146,7 +166,6 @@
                     </div>
                 </div>
 
-                <!-- 3. الإجمالي المحسوب آلياً -->
                 <div class="bg-amber-50/80 p-3.5 rounded-2xl border border-amber-200 flex justify-between items-center">
                     <div>
                         <span class="text-xs text-amber-800 font-bold block">المبلغ الإجمالي المحسوب</span>
@@ -158,7 +177,6 @@
                     </div>
                 </div>
 
-                <!-- 4. التصنيف -->
                 <div>
                     <label class="text-xs text-gray-600 font-bold block mb-1.5">التصنيف</label>
                     <div class="grid grid-cols-4 gap-2 text-center">
@@ -178,13 +196,11 @@
                     <input type="hidden" id="exp-cat" value="goods">
                 </div>
 
-                <!-- 5. المرفقات الحالية عند التعديل -->
                 <div id="current-attachments-area" class="hidden">
                     <label class="text-xs text-gray-500 font-bold block mb-1.5">المرفقات الحالية:</label>
                     <div id="current-attachments-list" class="space-y-1.5"></div>
                 </div>
 
-                <!-- 6. رفع صورة الصنف / الفاتورة -->
                 <div>
                     <label class="text-xs text-gray-600 font-bold block mb-1">صورة الصنف أو الفاتورة</label>
                     <label class="block w-full border-2 border-dashed border-gray-300 rounded-2xl p-4 text-center cursor-pointer hover:bg-amber-50/30 hover:border-amber-400 transition bg-gray-50">
@@ -216,6 +232,53 @@
         </div>
     </div>
 
+    <!-- 6. قالب توليد الفاتورة المخفي (PDF Template) -->
+    <div id="invoice-render-area">
+        <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1 style="font-size: 26px; font-weight: 900; color: #d97706; margin: 0;">فاتورة مصاريف وأصناف</h1>
+                <p style="font-size: 14px; color: #64748b; margin: 5px 0 0 0;" id="pdf-proj-name">المشروع: --</p>
+            </div>
+            <div style="text-align: left;">
+                <p style="font-size: 12px; color: #94a3b8; margin: 0;">تاريخ التصدير</p>
+                <p style="font-size: 14px; font-weight: 700; color: #334155; margin: 2px 0 0 0;" id="pdf-proj-date">--</p>
+            </div>
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+            <thead>
+                <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+                    <th style="padding: 12px 10px; text-align: right; font-size: 13px; font-weight: 800; color: #475569;">#</th>
+                    <th style="padding: 12px 10px; text-align: right; font-size: 13px; font-weight: 800; color: #475569;">اسم الصنف / المنتج</th>
+                    <th style="padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 800; color: #475569;">التصنيف</th>
+                    <th style="padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 800; color: #475569;">الكمية</th>
+                    <th style="padding: 12px 10px; text-align: center; font-size: 13px; font-weight: 800; color: #475569;">سعر الحبة</th>
+                    <th style="padding: 12px 10px; text-align: left; font-size: 13px; font-weight: 800; color: #475569;">الإجمالي</th>
+                </tr>
+            </thead>
+            <tbody id="pdf-table-body">
+                <!-- صفوف الفاتورة -->
+            </tbody>
+        </table>
+
+        <div style="display: flex; justify-content: flex-end;">
+            <div style="width: 280px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 12px; padding: 18px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #92400e;">
+                    <span>عدد الأصناف:</span>
+                    <span id="pdf-total-items" style="font-weight: 800;">0</span>
+                </div>
+                <div style="border-top: 1px dashed #fde68a; padding-top: 10px; display: flex; justify-content: space-between; align-items: baseline;">
+                    <span style="font-size: 15px; font-weight: 900; color: #78350f;">الإجمالي الكلي:</span>
+                    <span style="font-size: 22px; font-weight: 900; color: #b45309;" id="pdf-grand-total">0 ر.س</span>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 40px; border-top: 1px solid #f1f5f9; padding-top: 15px; text-align: center; font-size: 11px; color: #94a3b8;">
+            تم استخراج هذه الفاتورة آلياً من نظام إدارة المصاريف
+        </div>
+    </div>
+
     <script>
         const firebaseConfig = {
           apiKey: "AIzaSyCRbN9PDuoqZ60BAU79S-cY_ka9dtLerL4",
@@ -244,6 +307,8 @@
             });
 
         let currentProjectId = null;
+        let currentProjectNameText = "";
+        let currentExpensesCache = [];
         let unsubscribe = null;
         let selectedFilesRaw = [];
         let currentAttachments = [];
@@ -300,6 +365,7 @@
 
         function openProject(id, name, total) {
             currentProjectId = id;
+            currentProjectNameText = name;
             document.getElementById('projects-view').classList.add('hidden');
             document.getElementById('expenses-view').classList.remove('hidden');
             document.getElementById('current-project-name').innerText = name;
@@ -311,6 +377,7 @@
                 const list = document.getElementById('expenses-list');
                 list.innerHTML = "";
                 let totalCalc = 0;
+                currentExpensesCache = [];
                 
                 if(snapshot.empty) {
                     list.innerHTML = `<div class="flex flex-col items-center justify-center py-16 text-gray-400"><div class="text-5xl mb-3">📋</div><p class="font-bold text-sm">لا توجد أصناف مضافة في هذا المشروع</p></div>`;
@@ -328,6 +395,8 @@
                     const unitPrice = data.unitPrice || (amt / qty);
                     totalCalc += amt;
                     
+                    currentExpensesCache.push({ id: expenseId, ...data, amount: amt, quantity: qty, unitPrice: unitPrice });
+
                     let icon = '📦'; let catLabel = 'بضاعة';
                     if(data.category === 'gov') { icon = '⚖️'; catLabel = 'حكومي'; }
                     if(data.category === 'equipment') { icon = '🥘'; catLabel = 'معدات'; }
@@ -378,7 +447,6 @@
                             </div>
                         </div>
 
-                        <!-- تفاصيل الكمية وسعر الحبة المنظمة -->
                         <div class="grid grid-cols-2 gap-2 mt-3 bg-gray-50 p-2.5 rounded-xl text-xs border border-gray-100 font-bold text-gray-700">
                             <div>الكمية: <span class="text-amber-700 font-extrabold text-sm">${qty}</span></div>
                             <div class="text-left">سعر الحبة: <span class="text-amber-700 font-extrabold text-sm">${Number(unitPrice).toLocaleString()}</span> ر.س</div>
@@ -401,6 +469,86 @@
                 document.getElementById('expense-count').innerText = `${snapshot.size} صنف`;
                 db.collection("projects").doc(id).update({ totalAmount: totalCalc });
             });
+        }
+
+        // ============================================
+        // نظام توليد فاتورة PDF احترافية
+        // ============================================
+        async function generateInvoicePDF() {
+            if (!currentExpensesCache.length) {
+                return alert("لا توجد أصناف مسجلة في هذا المشروع لتصدير فاتورة.");
+            }
+
+            const btn = document.getElementById('export-pdf-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<span class="loader !w-3.5 !h-3.5 !border-2"></span> جاري التصدير...`;
+            btn.disabled = true;
+
+            try {
+                // تعبئة بيانات الفاتورة
+                document.getElementById('pdf-proj-name').innerText = `المشروع: ${currentProjectNameText}`;
+                document.getElementById('pdf-proj-date').innerText = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+
+                const tbody = document.getElementById('pdf-table-body');
+                tbody.innerHTML = '';
+
+                const catMap = { 'goods': 'بضاعة', 'equipment': 'معدات', 'decor': 'ديكور', 'gov': 'حكومي' };
+                let grandTotal = 0;
+
+                currentExpensesCache.forEach((item, index) => {
+                    grandTotal += item.amount;
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid #f1f5f9';
+                    row.innerHTML = `
+                        <td style="padding: 10px; font-size: 12px; color: #64748b; font-weight: 700;">${index + 1}</td>
+                        <td style="padding: 10px; font-size: 13px; font-weight: 800; color: #1e293b;">${item.name || 'بدون اسم'}</td>
+                        <td style="padding: 10px; font-size: 12px; text-align: center; color: #475569;">${catMap[item.category] || 'أخرى'}</td>
+                        <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: 700; color: #0f172a;">${item.quantity || 1}</td>
+                        <td style="padding: 10px; font-size: 13px; text-align: center; color: #0f172a;">${Number(item.unitPrice || 0).toLocaleString()} ر.س</td>
+                        <td style="padding: 10px; font-size: 13px; text-align: left; font-weight: 800; color: #b45309;">${Number(item.amount || 0).toLocaleString()} ر.س</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                document.getElementById('pdf-total-items').innerText = `${currentExpensesCache.length} صنف`;
+                document.getElementById('pdf-grand-total').innerText = `${grandTotal.toLocaleString()} ر.س`;
+
+                // التقاط وتحويل القالب لـ PDF
+                const element = document.getElementById('invoice-render-area');
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 295;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                pdf.save(`فاتورة_${currentProjectNameText}_${Date.now()}.pdf`);
+
+            } catch (err) {
+                console.error("PDF generation error:", err);
+                alert("حدث خطأ أثناء تصدير ملف PDF: " + err.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
         }
 
         async function previewFile(expenseId, fileId, fileName, isChunked, fileType) {
